@@ -1,7 +1,16 @@
 import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { getFirebaseServices } from './firebase';
-import type { ResumeProfile } from './profile';
+import { resumeProfileSchema, type ResumeProfile } from './profile';
+import { z } from 'zod';
+
+const applicationSchema = z.object({
+  company: z.string().max(200),
+  role: z.string().max(300),
+  url: z.string().url(),
+  status: z.enum(['submitted', 'in_progress', 'interview', 'rejected', 'offer']),
+  createdAt: z.number().optional(),
+});
 
 export interface ApplicationRecord {
   id: string;
@@ -17,14 +26,14 @@ export async function saveResume(file: File, profile: ResumeProfile, uid: string
   const safeName = file.name.replace(/[^\w.-]/g, '_');
   const path = `resumes/${uid}/${Date.now()}-${safeName}`;
   await uploadBytes(ref(storage, path), file, { contentType: 'application/pdf' });
-  const savedProfile = { ...profile, resumePath: path, updatedAt: Date.now() };
+  const savedProfile = resumeProfileSchema.parse({ ...profile, resumePath: path, updatedAt: Date.now() });
   await setDoc(doc(db, 'users', uid, 'profile', 'current'), savedProfile);
   return { profile: savedProfile, downloadUrl: await getDownloadURL(ref(storage, path)) };
 }
 
 export async function saveProfile(profile: ResumeProfile, uid: string) {
   const { db } = await getFirebaseServices();
-  const savedProfile = { ...profile, updatedAt: Date.now() };
+  const savedProfile = resumeProfileSchema.parse({ ...profile, updatedAt: Date.now() });
   await setDoc(doc(db, 'users', uid, 'profile', 'current'), savedProfile);
   return savedProfile;
 }
@@ -32,7 +41,7 @@ export async function saveProfile(profile: ResumeProfile, uid: string) {
 export async function loadProfile(uid: string): Promise<ResumeProfile | null> {
   const { db } = await getFirebaseServices();
   const snapshot = await getDoc(doc(db, 'users', uid, 'profile', 'current'));
-  return snapshot.exists() ? snapshot.data() as ResumeProfile : null;
+  return snapshot.exists() ? resumeProfileSchema.parse(snapshot.data()) : null;
 }
 
 export async function getResumeUrl(path: string) {
@@ -43,7 +52,7 @@ export async function getResumeUrl(path: string) {
 export async function listApplications(uid: string): Promise<ApplicationRecord[]> {
   const { db } = await getFirebaseServices();
   const records = await getDocs(query(collection(db, 'users', uid, 'applications'), orderBy('createdAt', 'desc')));
-  return records.docs.map((record) => ({ id: record.id, ...record.data() } as ApplicationRecord));
+  return records.docs.map((record) => ({ id: record.id, ...applicationSchema.parse(record.data()) }));
 }
 
 export async function saveApplication(uid: string, input: Omit<ApplicationRecord, 'id' | 'createdAt'>) {
