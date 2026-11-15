@@ -2,7 +2,7 @@
 
 ## Product vision
 
-ApplyAI is a privacy-first Chrome extension that helps job seekers complete job applications faster. It uses the applicant's saved profile, resume, and approved answers to understand and fill application forms, primarily using on-device AI.
+ApplyAI is a privacy-conscious Chrome extension that helps job seekers complete application forms faster. Users upload a resume, review and edit extracted profile information in a dashboard, then use that profile to fill supported job applications. AI is used where helpful, with clear control over cloud processing.
 
 ## Target user
 
@@ -14,23 +14,28 @@ As a job seeker, I want an AI assistant that understands my background and fills
 
 ## MVP user stories and acceptance criteria
 
-### US-01 — Create my profile
+### US-01 — Upload resume and manage my profile
 
 As a job seeker, I want to upload my resume and save additional information once, so that I can reuse it across applications.
 
-- I can upload a PDF resume and enter or edit my profile details.
-- Extracted information can be reviewed and corrected before saving.
-- My profile is stored locally by default and persists across browser sessions.
+- I can upload a PDF resume after signing in.
+- The app extracts skills, university, name, LinkedIn URL, portfolio URL, email, phone number, graduation date, work experience, projects, and achievements when present.
+- Extracted information is shown in a profile dashboard and can be edited before and after saving.
+- Missing or unclear information is left blank or marked for review; it is not guessed.
+- The original PDF is stored in Google Cloud Storage and the structured profile metadata is stored in Firestore, associated with the signed-in user.
 
-### US-02 — Detect application fields
+### US-02 — Autofill an open job application
 
-As a job seeker, I want the extension to understand the job application page, so that I do not have to identify each field manually.
+As a job seeker, I want to activate ApplyAI while a supported job application is open in Chrome, so that it can fill fields using my reviewed profile.
 
-- When I activate the extension, it detects accessible form fields, labels, options, and required fields on a supported page.
-- It understands common text inputs, text areas, select menus, radio buttons, and checkboxes.
+- I can open the extension on a supported job application page and explicitly start autofill.
+- It detects accessible form fields, labels, options, and required fields.
+- It supports common text inputs, text areas, select menus, radio buttons, and checkboxes where the page permits interaction.
+- It shows proposed values for review and lets me edit them before or after filling.
 - Unsupported or ambiguous fields are flagged instead of guessed.
+- It never submits an application automatically.
 
-### US-03 — Fill in my information
+### US-03 — Match profile information to application fields
 
 As a job seeker, I want the extension to fill out the application using my saved information, so that I can avoid repetitive work.
 
@@ -60,18 +65,19 @@ As a job seeker, I want a record of my applications, so that I can track progres
 
 ## MVP scope
 
-- Chrome desktop extension with an onboarding/profile screen and a side panel or popup.
+- Chrome desktop extension with sign-in, resume upload, editable profile dashboard, and a side panel or popup for application autofill.
+- Google Authentication, Cloud Storage for original resume PDFs, and Firestore for user profile metadata.
 - One supported ATS platform plus a controlled test form for the hackathon demo.
-- Local profile storage, form detection, grounded autofill, review, and application history.
+- Resume parsing and editable profile dashboard, supported-page form detection, grounded autofill, review, and application history.
 - Firebase AI Logic on-device and consent-based cloud inference.
 
 ## Out of scope for MVP
 
 - Automatic submission, mass applications, or CAPTCHA bypass.
 - Support for every job website or every iframe/custom widget.
-- Automatic resume rewriting or cover letter generation.
+- Automatic resume rewriting or cover letter generation (future features; all generated content would require user review).
 - External email/calendar integrations and advanced cloud analytics.
 
 ## Definition of done
 
-A user can upload and verify a resume, open a supported application, activate ApplyAI, see a locally grounded set of answers, review and edit the filled fields, submit manually, and save a confirmed application record. The demo also shows the difference between on-device and approved cloud inference.
+A user can sign in, upload a PDF, review and edit extracted profile fields in the dashboard, open a supported application in Chrome, activate autofill, review and edit proposed answers, fill the form, submit manually, and save a confirmed application record.
