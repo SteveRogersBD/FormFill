@@ -30,9 +30,11 @@ export function findProfileValue(label: string, profile: import('./profile').Res
   if (match[1] === 'fullName' && /\b(first|given) name\b/.test(normalized)) value = profile.fullName.split(/\s+/)[0] ?? '';
   if (match[1] === 'fullName' && /\b(last|family|sur) ?name\b/.test(normalized)) value = profile.fullName.split(/\s+/).at(-1) ?? '';
   if (Array.isArray(value)) value = value.join(', ');
+  if (typeof value === 'string' && ['linkedin', 'portfolio'].includes(match[1]) && value.trim() && !/^https?:\\/\\//i.test(value)) value = https://;
   return typeof value === 'string' && value.trim() ? value : undefined;
 }
 
 export function isSensitiveField(label: string): boolean {
   return /salary|compensation|sponsorship|visa|work authorization|authorized to work|criminal|disability|gender|race|ethnicity/i.test(label);
 }
+
