@@ -1,5 +1,5 @@
-import { addDoc, collection, doc, getDoc, orderBy, query, serverTimestamp, setDoc, type Firestore } from 'firebase/firestore';
-import { getDownloadURL, ref, uploadBytes, type FirebaseStorage } from 'firebase/storage';
+import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { getFirebaseServices } from './firebase';
 import type { ResumeProfile } from './profile';
 
@@ -42,7 +42,7 @@ export async function getResumeUrl(path: string) {
 
 export async function listApplications(uid: string): Promise<ApplicationRecord[]> {
   const { db } = await getFirebaseServices();
-  const records = await import('firebase/firestore').then(({ getDocs }) => getDocs(query(collection(db, 'users', uid, 'applications'), orderBy('createdAt', 'desc'))));
+  const records = await getDocs(query(collection(db, 'users', uid, 'applications'), orderBy('createdAt', 'desc')));
   return records.docs.map((record) => ({ id: record.id, ...record.data() } as ApplicationRecord));
 }
 
@@ -50,3 +50,4 @@ export async function saveApplication(uid: string, input: Omit<ApplicationRecord
   const { db } = await getFirebaseServices();
   await addDoc(collection(db, 'users', uid, 'applications'), { ...input, createdAt: Date.now(), serverCreatedAt: serverTimestamp() });
 }
+
