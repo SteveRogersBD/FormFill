@@ -3,17 +3,22 @@
   "name": "ApplyAI",
   "version": "0.1.0",
   "description": "Review your resume profile and fill supported job applications.",
-  "permissions": ["activeTab", "scripting", "storage", "sidePanel"],
+  "permissions": ["activeTab", "scripting", "sidePanel", "offscreen"],
   "host_permissions": [
     "https://*.googleapis.com/*",
     "https://*.firebaseio.com/*",
     "https://*.firebasestorage.app/*",
     "https://*.appspot.com/*",
+    "https://*.firebaseapp.com/*",
+    "https://*.web.app/*",
     "https://identitytoolkit.googleapis.com/*",
     "https://securetoken.googleapis.com/*"
   ],
   "background": { "service_worker": "background.js", "type": "module" },
   "action": { "default_title": "Open ApplyAI" },
   "side_panel": { "default_path": "sidepanel.html" },
-  "options_ui": { "page": "dashboard.html", "open_in_tab": true }
+  "options_ui": { "page": "dashboard.html", "open_in_tab": true },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'; frame-src https://*.web.app https://*.firebaseapp.com; connect-src 'self' https://apis.google.com https://www.gstatic.com https://www.googleapis.com https://securetoken.googleapis.com https://identitytoolkit.googleapis.com https://*.googleapis.com https://*.firebaseio.com https://*.firebasestorage.app https://*.appspot.com wss://*.firebaseio.com"
+  }
 }
