@@ -9,6 +9,8 @@ export default defineConfig({
       input: {
         dashboard: resolve(__dirname, 'dashboard.html'),
         sidepanel: resolve(__dirname, 'sidepanel.html'),
+        offscreen: resolve(__dirname, 'offscreen.html'),
+        authHelper: resolve(__dirname, 'auth-helper.html'),
         background: resolve(__dirname, 'src/background.ts'),
         content: resolve(__dirname, 'src/content.ts'),
       },
