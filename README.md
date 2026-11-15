@@ -59,3 +59,5 @@ The extension currently uses generic accessible DOM fields and the controlled te
 
 For cloud AI, register the web app with Firebase App Check and configure its reCAPTCHA v3 site key as `VITE_FIREBASE_APPCHECK_SITE_KEY`. For local development only, set `VITE_FIREBASE_APPCHECK_DEBUG=true`, run the extension, and register the generated debug token in Firebase App Check. Never ship the debug setting or token.
 
+
+Run the automated unit tests with `npm test`.
