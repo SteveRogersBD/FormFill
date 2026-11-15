@@ -1,4 +1,4 @@
-import { addDoc, collection, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, orderBy, query, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { getFirebaseServices } from './firebase';
 import type { ResumeProfile } from './profile';
@@ -49,5 +49,15 @@ export async function listApplications(uid: string): Promise<ApplicationRecord[]
 export async function saveApplication(uid: string, input: Omit<ApplicationRecord, 'id' | 'createdAt'>) {
   const { db } = await getFirebaseServices();
   await addDoc(collection(db, 'users', uid, 'applications'), { ...input, createdAt: Date.now(), serverCreatedAt: serverTimestamp() });
+}
+
+export async function updateApplication(uid: string, id: string, status: ApplicationRecord['status']) {
+  const { db } = await getFirebaseServices();
+  await updateDoc(doc(db, 'users', uid, 'applications', id), { status });
+}
+
+export async function deleteApplication(uid: string, id: string) {
+  const { db } = await getFirebaseServices();
+  await deleteDoc(doc(db, 'users', uid, 'applications', id));
 }
 
