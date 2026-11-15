@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Product Designer — ApplyAI Demo</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 48px 20px; color: #17231d; background: #f4f6f2; font: 16px system-ui, sans-serif; }
+    main { max-width: 720px; margin: auto; padding: 36px; background: white; border: 1px solid #e4eae5; border-radius: 18px; box-shadow: 0 15px 50px #26382d0b; }
+    h1 { margin: 0 0 8px; font-size: 2rem; letter-spacing: -.04em; }
+    p { color: #68756d; line-height: 1.6; }
+    .role { padding: 15px; margin: 22px 0 28px; background: #f3f7f3; border-radius: 12px; }
+    .role strong { color: #24764c; }
+    .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    label, fieldset { display: grid; gap: 7px; color: #445249; font-size: .84rem; font-weight: 650; }
+    input, textarea, select { width: 100%; padding: 11px; border: 1px solid #dfe7e0; border-radius: 8px; color: #17231d; font: inherit; font-weight: 400; }
+    textarea { min-height: 90px; resize: vertical; }
+    fieldset { grid-column: 1 / -1; border: 1px solid #dfe7e0; border-radius: 10px; padding: 14px; }
+    fieldset label { display: flex; align-items: center; gap: 8px; font-weight: 400; }
+    fieldset input { width: auto; }
+    .wide { grid-column: 1 / -1; }
+    .check { display: flex; align-items: center; gap: 9px; font-weight: 400; }
+    .check input { width: auto; }
+    .submit { padding: 12px 18px; color: white; background: #23764f; border: 0; border-radius: 9px; font-weight: 700; }
+    .hint { margin: 24px 0 0; font-size: .75rem; }
+    @media(max-width: 600px) { .fields { grid-template-columns: 1fr; } main { padding: 24px; } }
+  </style>
+</head>
+<body>
+<main>
+  <p><strong>APPLYAI TEST FORM</strong></p>
+  <h1>Product Designer</h1>
+  <div class="role"><strong>Northstar Studio · Remote</strong><p>We build thoughtful collaboration tools. Tell us a little about your background and the work you’re proud of.</p></div>
+  <form class="fields" aria-label="Job application">
+    <label>Full name<input name="name" autocomplete="name" required /></label>
+    <label>Email address<input name="email" type="email" autocomplete="email" required /></label>
+    <label>Phone number<input name="phone" type="tel" autocomplete="tel" /></label>
+    <label>LinkedIn profile<input name="linkedin" type="url" placeholder="https://linkedin.com/in/…" /></label>
+    <label>Portfolio website<input name="portfolio" type="url" /></label>
+    <label>University or college<input name="university" /></label>
+    <label class="wide">What skills would you bring to this role?<textarea name="skills"></textarea></label>
+    <label class="wide">Tell us about a project you’re proud of<textarea name="project"></textarea></label>
+    <label class="wide">Describe relevant work experience<textarea name="experience"></textarea></label>
+    <fieldset><legend>Are you legally authorized to work in the United States?</legend><label><input type="radio" name="authorization" value="Yes" /> Yes</label><label><input type="radio" name="authorization" value="No" /> No</label></fieldset>
+    <label class="check wide"><input type="checkbox" name="accuracy" /> I confirm the information I provided is accurate.</label>
+    <button class="submit wide" type="button">Demo only · does not submit</button>
+  </form>
+  <p class="hint">Open the ApplyAI extension, scan this form, review the suggested profile answers, then fill it. No form data is submitted.</p>
+</main>
+</body>
+</html>
