@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { findProfileValue, isSensitiveField } from './fields';
+import { suggestCloudAnswers, suggestOnDeviceAnswers } from './ai';
 import { listApplications, loadProfile, saveApplication, type ApplicationRecord } from './data';
 import { emptyProfile, type ResumeProfile } from './profile';
 
@@ -31,6 +32,8 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
   const [filled, setFilled] = useState(false);
+  const [cloudConsent, setCloudConsent] = useState(false);
+  const [inferenceSource, setInferenceSource] = useState('');
 
   useEffect(() => {
     Promise.all([loadProfile(user.uid), listApplications(user.uid)]).then(([savedProfile, records]) => {
@@ -68,6 +71,21 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     finally { setBusy(false); }
   };
 
+  const suggestWithAI = async (cloud: boolean) => {
+    if (!scan) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const result = cloud
+        ? await suggestCloudAnswers(scan.fields, profile)
+        : await suggestOnDeviceAnswers(scan.fields, profile);
+      setValues((current) => ({ ...result.answers, ...Object.fromEntries(Object.entries(current).filter(([, value]) => value.trim())) }));
+      setInferenceSource(result.source === 'ON_DEVICE' ? 'On-device AI' : 'Cloud AI (approved)');
+      setNotice('AI suggestions are ready. Check and edit each answer before filling the page.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'AI suggestions are unavailable. You can still use exact profile matches.');
+    } finally { setBusy(false); }
+  };
+
   const confirmSubmitted = async () => {
     if (!scan) return;
     setBusy(true); setError('');
@@ -86,7 +104,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     {error && <div className="notice error compact-notice" role="alert">{error}</div>}{notice && <div className="notice success compact-notice" role="status">{notice}</div>}
     {!loading && !profile.updatedAt && <div className="notice info compact-notice">Set up your resume profile first. <a href="dashboard.html" target="_blank">Open dashboard ↗</a></div>}
     <button className="button primary wide scan-button" onClick={scanPage} disabled={loading || busy || !profile.updatedAt}>{busy ? 'Working…' : scan ? 'Scan page again' : 'Scan this application'}</button>
-    {suggestions.length > 0 && <section className="panel-section"><div className="panel-section-heading"><h2>Review answers</h2><span>{suggestions.length} fields</span></div><div className="answer-list">{suggestions.map(({ field, suggested }) => {
+    {suggestions.length > 0 && <section className="panel-section"><div className="panel-section-heading"><h2>Review answers</h2><span>{suggestions.length} fields</span></div>{inferenceSource && <div className="inference-badge">✦ {inferenceSource}</div>}<div className="answer-list">{suggestions.map(({ field, suggested }) => {
       const sensitive = isSensitiveField(field.label);
       const unsupported = ['file', 'password', 'date', 'number'].includes(field.type);
       return <div className="answer-row" key={field.id}><label className="answer-label" htmlFor={`answer-${field.id}`}>{field.label || 'Unlabeled field'}{field.required && <i>Required</i>}</label>
@@ -97,7 +115,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         {unsupported && <span className="field-hint">This field type needs your attention on the page.</span>}
         {!suggested && !values[field.id] && !unsupported && !sensitive && <span className="field-hint">No matching profile detail. It will stay empty.</span>}
       </div>;
-    })}</div><button className="button primary wide fill-button" onClick={fillPage} disabled={busy}>{busy ? 'Filling…' : 'Fill reviewed answers'}</button><p className="fine-print center">ApplyAI never submits the application for you.</p></section>}
+    })}</div><button className="button secondary wide ai-button" onClick={() => suggestWithAI(false)} disabled={busy}>✦ Suggest with on-device AI</button><label className="cloud-consent"><input type="checkbox" checked={cloudConsent} onChange={(event) => setCloudConsent(event.target.checked)} /> I approve sending this form’s field labels and relevant profile details to Firebase AI Logic for cloud suggestions.</label><button className="text-button cloud-button" onClick={() => suggestWithAI(true)} disabled={busy || !cloudConsent}>Use cloud AI with my approval ↗</button><button className="button primary wide fill-button" onClick={fillPage} disabled={busy}>{busy ? 'Working…' : 'Fill reviewed answers'}</button><p className="fine-print center">ApplyAI never submits the application for you.</p></section>}
     {filled && <section className="confirm-card"><p className="eyebrow">AFTER YOU SUBMIT</p><h2>Applied? Save it here.</h2><label className="form-field"><span>Company</span><input value={company} onChange={(event) => setCompany(event.target.value)} /></label><label className="form-field"><span>Role</span><input value={role} onChange={(event) => setRole(event.target.value)} /></label><button className="button secondary wide" onClick={confirmSubmitted} disabled={busy}>I submitted this application</button></section>}
     <section className="panel-section recent-applications"><div className="panel-section-heading"><h2>Recent applications</h2><a href="dashboard.html" target="_blank">View all</a></div>{applications.length === 0 ? <p className="empty-state">Your confirmed applications will appear here.</p> : applications.slice(0, 3).map((application) => <div className="mini-application" key={application.id}><span>{application.role || application.company || 'Application'}</span><i>{application.status.replace('_', ' ')}</i></div>)}</section>
   </main>;
