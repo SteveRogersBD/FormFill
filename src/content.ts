@@ -58,11 +58,32 @@ function fillFields(values: Record<string, string>) {
   for (const [id, value] of Object.entries(values)) {
     const elements = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(`[data-applyai-field="${CSS.escape(id)}"]`)];
     const first = elements[0];
-    if (!first || !value || first instanceof HTMLInputElement && ['checkbox', 'radio', 'file', 'date', 'number'].includes(first.type)) continue;
+    if (!first || !value) continue;
+    if (first instanceof HTMLInputElement && first.type === 'radio') {
+      const selected = elements.find((element) => element instanceof HTMLInputElement && element.type === 'radio' && (element.value.trim().toLowerCase() === value.trim().toLowerCase() || element.labels?.[0]?.innerText.trim().toLowerCase() === value.trim().toLowerCase()));
+      if (!(selected instanceof HTMLInputElement)) continue;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked')?.set?.call(selected, true);
+      selected.dispatchEvent(new Event('input', { bubbles: true }));
+      selected.dispatchEvent(new Event('change', { bubbles: true }));
+      filled += 1;
+      continue;
+    }
+    if (first instanceof HTMLInputElement && first.type === 'checkbox') {
+      if (value !== 'true') continue;
+      Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'checked')?.set?.call(first, true);
+      first.dispatchEvent(new Event('input', { bubbles: true }));
+      first.dispatchEvent(new Event('change', { bubbles: true }));
+      filled += 1;
+      continue;
+    }
+    if (first instanceof HTMLInputElement && ['file', 'password', 'number'].includes(first.type)) continue;
     if (first instanceof HTMLSelectElement) {
       const option = [...first.options].find((item) => item.text.trim().toLowerCase() === value.trim().toLowerCase() || item.value.toLowerCase() === value.trim().toLowerCase());
       if (!option) continue;
       setValue(first, option.value);
+    } else if (first instanceof HTMLInputElement && first.type === 'date') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) continue;
+      setValue(first, value);
     } else if (first instanceof HTMLInputElement && first.type === 'url' && !/^https?:\/\//i.test(value)) {
       continue;
     } else {
