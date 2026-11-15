@@ -1,0 +1,17 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/profile/{profileId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+    match /users/{userId}/applications/{applicationId} {
+      allow read, delete: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly(['company', 'role', 'url', 'status', 'createdAt', 'serverCreatedAt'])
+        && request.resource.data.status in ['submitted', 'in_progress', 'interview', 'rejected', 'offer'];
+      allow update: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+        && request.resource.data.status in ['submitted', 'in_progress', 'interview', 'rejected', 'offer'];
+    }
+  }
+}
