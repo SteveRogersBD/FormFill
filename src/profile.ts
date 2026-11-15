@@ -1,19 +1,22 @@
-export interface ResumeProfile {
-  fullName: string;
-  email: string;
-  phone: string;
-  linkedin: string;
-  portfolio: string;
-  university: string;
-  graduationDate: string;
-  skills: string[];
-  workExperience: string[];
-  projects: string[];
-  achievements: string[];
-  resumePath: string;
-  updatedAt?: number;
-}
+import { z } from 'zod';
 
+export const resumeProfileSchema = z.object({
+  fullName: z.string().max(200).default(''),
+  email: z.string().max(320).default(''),
+  phone: z.string().max(80).default(''),
+  linkedin: z.string().max(500).default(''),
+  portfolio: z.string().max(500).default(''),
+  university: z.string().max(300).default(''),
+  graduationDate: z.string().max(80).default(''),
+  skills: z.array(z.string().max(200)).max(100).default([]),
+  workExperience: z.array(z.string().max(2000)).max(100).default([]),
+  projects: z.array(z.string().max(2000)).max(100).default([]),
+  achievements: z.array(z.string().max(1000)).max(100).default([]),
+  resumePath: z.string().max(1000).default(''),
+  updatedAt: z.number().optional(),
+}).strict();
+
+export type ResumeProfile = z.infer<typeof resumeProfileSchema>;
 export type ProfileField = Exclude<keyof ResumeProfile, 'resumePath' | 'updatedAt'>;
 
 export const PROFILE_FIELDS: { key: ProfileField; label: string; multiline?: boolean; list?: boolean }[] = [
