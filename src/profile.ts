@@ -8,6 +8,7 @@ export const resumeProfileSchema = z.object({
   portfolio: z.string().max(500).default(''),
   university: z.string().max(300).default(''),
   graduationDate: z.string().max(80).default(''),
+  targetRole: z.string().max(200).default(''),
   skills: z.array(z.string().max(200)).max(100).default([]),
   workExperience: z.array(z.string().max(2000)).max(100).default([]),
   projects: z.array(z.string().max(2000)).max(100).default([]),
@@ -27,6 +28,7 @@ export const PROFILE_FIELDS: { key: ProfileField; label: string; multiline?: boo
   { key: 'portfolio', label: 'Portfolio URL' },
   { key: 'university', label: 'University' },
   { key: 'graduationDate', label: 'Graduation date' },
+  { key: 'targetRole', label: 'Role you’re looking for' },
   { key: 'skills', label: 'Skills', list: true, multiline: true },
   { key: 'workExperience', label: 'Work experience', list: true, multiline: true },
   { key: 'projects', label: 'Projects', list: true, multiline: true },
@@ -34,5 +36,5 @@ export const PROFILE_FIELDS: { key: ProfileField; label: string; multiline?: boo
 ];
 
 export function emptyProfile(): ResumeProfile {
-  return { fullName: '', email: '', phone: '', linkedin: '', portfolio: '', university: '', graduationDate: '', skills: [], workExperience: [], projects: [], achievements: [], resumePath: '' };
+  return { fullName: '', email: '', phone: '', linkedin: '', portfolio: '', university: '', graduationDate: '', targetRole: '', skills: [], workExperience: [], projects: [], achievements: [], resumePath: '' };
 }
