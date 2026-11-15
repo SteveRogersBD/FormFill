@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "engines": { "node": ">=24.12.0" },
+  "engines": {
+    "node": ">=24.12.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -12,7 +14,6 @@
   },
   "dependencies": {
     "@firebase/auth": "1.13.10",
-    "dexie": "^4.0.8",
     "firebase": "13.3.0",
     "pdfjs-dist": "^4.8.69",
     "react": "^18.3.1",
