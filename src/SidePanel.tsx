@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { findProfileValue, isSensitiveField } from './fields';
-import { suggestCloudAnswers, suggestOnDeviceAnswers } from './ai';
 import { listApplications, loadProfile, saveApplication, type ApplicationRecord } from './data';
 import { emptyProfile, type ResumeProfile } from './profile';
 
@@ -75,6 +74,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     if (!scan) return;
     setBusy(true); setError(''); setNotice('');
     try {
+      const { suggestCloudAnswers, suggestOnDeviceAnswers } = await import('./ai');
       const result = cloud
         ? await suggestCloudAnswers(scan.fields, profile)
         : await suggestOnDeviceAnswers(scan.fields, profile);
