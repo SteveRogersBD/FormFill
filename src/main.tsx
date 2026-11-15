@@ -28,6 +28,12 @@ function App() {
   }, []);
 
   const login = async () => {
+    if (import.meta.env.DEV && (typeof chrome === 'undefined' || !chrome.runtime?.id)) {
+      const { auth } = await getFirebaseServices();
+      const { GoogleAuthProvider: WebGoogleProvider, signInWithPopup } = await import('firebase/auth');
+      await signInWithPopup(auth, new WebGoogleProvider());
+      return;
+    }
     const credential = await chrome.runtime.sendMessage({ type: 'APPLYAI_SIGN_IN' }) as { idToken?: string; accessToken?: string; error?: string };
     if (credential.error) throw new Error(credential.error);
     if (!credential.idToken || !credential.accessToken) throw new Error('Google sign-in did not return an authentication token.');
