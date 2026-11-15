@@ -20,7 +20,7 @@ As a job seeker, I want to upload my resume and save additional information once
 
 - I can upload a PDF resume after signing in.
 - The app extracts skills, university, name, LinkedIn URL, portfolio URL, email, phone number, graduation date, work experience, projects, and achievements when present.
-- Extracted information is shown in a profile dashboard and can be edited before and after saving.
+- Extracted information is shown in a profile dashboard and can be edited before and after saving. I can also add a target role I am looking for.
 - Missing or unclear information is left blank or marked for review; it is not guessed.
 - The original PDF is stored in Google Cloud Storage and the structured profile metadata is stored in Firestore, associated with the signed-in user.
 
@@ -81,3 +81,4 @@ As a job seeker, I want a record of my applications, so that I can track progres
 ## Definition of done
 
 A user can sign in, upload a PDF, review and edit extracted profile fields in the dashboard, open a supported application in Chrome, activate autofill, review and edit proposed answers, fill the form, submit manually, and save a confirmed application record.
+
