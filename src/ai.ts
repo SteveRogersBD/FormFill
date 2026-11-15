@@ -19,12 +19,13 @@ function profileEvidence(label: string, profile: ResumeProfile) {
   if (/skill|technology|programming/.test(normalized)) return { skills: profile.skills };
   if (/project/.test(normalized)) return { projects: profile.projects };
   if (/award|achievement|honor/.test(normalized)) return { achievements: profile.achievements };
+  if (/target role|desired role|position sought/.test(normalized)) return { targetRole: profile.targetRole };
   if (/experience|employment|career|responsibilit|accomplish/.test(normalized)) return { workExperience: profile.workExperience, projects: profile.projects };
-  return { skills: profile.skills, university: profile.university, graduationDate: profile.graduationDate, workExperience: profile.workExperience, projects: profile.projects, achievements: profile.achievements };
+  return { targetRole: profile.targetRole, skills: profile.skills, university: profile.university, graduationDate: profile.graduationDate, workExperience: profile.workExperience, projects: profile.projects, achievements: profile.achievements };
 }
 
 function makePrompt(fields: AIField[], profile: ResumeProfile, cloud: boolean) {
-  const answerable = fields.filter((field) => ['text', 'textarea', 'email', 'tel', 'url', 'select-one', 'select'].includes(field.type) && !/salary|compensation|sponsorship|visa|work authorization|authorized to work|criminal|disability|gender|race|ethnicity/i.test(field.label));
+  const answerable = fields.filter((field) => ['text', 'textarea', 'email', 'tel', 'url', 'select-one', 'select'].includes(field.type) && !/salary|compensation|sponsorship|visa|work authorization|authorized to work|criminal|disability|gender|race|ethnicity/i.test(field.label)).map(({ id, label, type }) => ({ id, label, type }));
   const evidence = cloud
     ? answerable.map((field) => ({ fieldId: field.id, facts: profileEvidence(field.label, profile) }))
     : profile;
