@@ -26,7 +26,7 @@
 - **Content script:** On explicit user activation, read the active supported job page DOM, extract normalized fields, and fill validated answers. Handle page-specific dynamic form events where supported.
 - **Background service worker:** Coordinate messages, supported tab access, and lifecycle events. Do not assume a permanently running background process.
 - **Authentication:** Use Firebase Authentication Google sign-in through a Manifest V3 offscreen document and a hosted helper page; do not call popup sign-in directly from an extension page.
-- **Dashboard:** Provide sign-in, PDF upload, extraction progress, and editable profile sections: skills, university, name, LinkedIn, portfolio, email, phone, graduation date, work experience, projects, and achievements.
+- **Dashboard:** Provide sign-in, PDF upload, extraction progress, and editable profile sections: skills, university, name, LinkedIn, portfolio, email, phone, graduation date, work experience, projects, and achievements, plus a user-entered target role.
 - **Side panel or popup:** Display detected application fields, proposed answers, edit/review controls, inference mode, consent prompts, and history. Host the AI workflow in a supported extension document context rather than assuming it can run in a service worker.
 - **Resume pipeline:** Upload the source PDF to a user-scoped Cloud Storage path; extract PDF text with PDF.js; structure text into profile fields; validate and show fields for correction before saving.
 - **Cloud data layer:** Encapsulate Firebase Authentication, Firestore profile/application records, and Cloud Storage resume operations. Treat the user's reviewed profile as the source of truth for autofill.
@@ -79,3 +79,5 @@ Exact facts such as name, email, phone, university, and graduation date should u
 - [Hybrid inference configuration](https://firebase.google.com/docs/ai-logic/hybrid/web/configuration-options)
 - [Structured outputs](https://firebase.google.com/docs/ai-logic/hybrid/web/generate-structured-output)
 - [Firebase Hybrid AI Hackathon](https://firebasehybridaihackathon.devpost.com/)
+
+
