@@ -20,10 +20,10 @@ export function findProfileValue(label: string, profile: import('./profile').Res
     [/\b(university|college|school|institution)\b/, 'university'],
     [/\b(graduation|degree completion|graduated)\b/, 'graduationDate'],
     [/\b(target role|desired role|role you are seeking|position sought)\b/, 'targetRole'],
-    [/\b(skill|technology|programming language)\b/, 'skills'],
+    [/\b(skills?|technologies?|programming languages?)\b/, 'skills'],
     [/\b(work experience|employment|professional experience)\b/, 'workExperience'],
-    [/\b(project)\b/, 'projects'],
-    [/\b(achievement|award|honor)\b/, 'achievements'],
+    [/\bprojects?\b/, 'projects'],
+    [/\b(achievements?|awards?|honors?)\b/, 'achievements'],
   ];
   const match = matches.find(([pattern]) => pattern.test(normalized));
   if (!match) return undefined;
