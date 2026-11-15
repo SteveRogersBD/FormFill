@@ -1,8 +1,7 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import type { User } from 'firebase/auth';
-import { getResumeUrl, listApplications, loadProfile, saveProfile, saveResume, type ApplicationRecord } from './data';
+import { deleteApplication, getResumeUrl, listApplications, loadProfile, saveProfile, saveResume, updateApplication, type ApplicationRecord } from './data';
 import { emptyProfile, PROFILE_FIELDS, type ProfileField, type ResumeProfile } from './profile';
-import { extractProfile } from './resumeParser';
 
 export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Promise<void> }) {
   const [profile, setProfile] = useState<ResumeProfile>(emptyProfile());
@@ -29,6 +28,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
     setFile(selected);
     setWorking(true);
     try {
+      const { extractProfile } = await import('./resumeParser');
       const extracted = await extractProfile(selected);
       setProfile((current) => ({ ...extracted, resumePath: current.resumePath }));
       setMessage('Resume parsed in this browser. Review every field and fill in anything that was missed.');
@@ -56,6 +56,21 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not open the saved resume.'); }
   };
 
+  const changeStatus = async (application: ApplicationRecord, status: ApplicationRecord['status']) => {
+    try {
+      await updateApplication(user.uid, application.id, status);
+      setApplications((current) => current.map((item) => item.id === application.id ? { ...item, status } : item));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not update this application.'); }
+  };
+
+  const removeApplication = async (application: ApplicationRecord) => {
+    if (!window.confirm(`Delete the ${application.role || application.company || 'application'} record?`)) return;
+    try {
+      await deleteApplication(user.uid, application.id);
+      setApplications((current) => current.filter((item) => item.id !== application.id));
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not delete this application.'); }
+  };
+
   return <div className="dashboard-shell">
     <header className="topbar">
       <a className="brand" href="dashboard.html"><span className="brand-mark small">A</span><span>apply<span className="brand-accent">ai</span></span></a>
@@ -80,7 +95,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
         </section>
       </div>
       <section className="card applications-card"><div className="section-heading"><div><p className="eyebrow">YOUR SEARCH</p><h2>Applications</h2></div><span className="field-count">{applications.length} saved</span></div>
-        {loading ? <div className="skeleton">Loading applications…</div> : applications.length === 0 ? <p className="empty-state">When you confirm that you’ve applied, your application will show up here.</p> : <div className="application-list">{applications.map((application) => <article className="application-row" key={application.id}><div><strong>{application.role || 'Role not specified'}</strong><span>{application.company || application.url}</span></div><span className="application-status">{application.status.replace('_', ' ')}</span><time>{application.createdAt ? new Date(application.createdAt).toLocaleDateString() : ''}</time></article>)}</div>}
+        {loading ? <div className="skeleton">Loading applications…</div> : applications.length === 0 ? <p className="empty-state">When you confirm that you’ve applied, your application will show up here.</p> : <div className="application-list">{applications.map((application) => <article className="application-row" key={application.id}><div><strong>{application.role || 'Role not specified'}</strong><span>{application.company || application.url}</span><a href={application.url} target="_blank" rel="noreferrer">Open application ↗</a></div><select aria-label={`Update status for ${application.role || application.company}`} value={application.status} onChange={(event) => changeStatus(application, event.target.value as ApplicationRecord['status'])}><option value="submitted">Submitted</option><option value="in_progress">In progress</option><option value="interview">Interview</option><option value="rejected">Rejected</option><option value="offer">Offer</option></select><time>{application.createdAt ? new Date(application.createdAt).toLocaleDateString() : ''}</time><button className="text-button delete-button" onClick={() => removeApplication(application)}>Delete</button></article>)}</div>}
       </section>
     </main>
   </div>;
