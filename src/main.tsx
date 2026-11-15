@@ -1,4 +1,4 @@
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
+import { GoogleAuthProvider, onAuthStateChanged, signInWithCredential, signOut, type User } from 'firebase/auth/web-extension';
 import { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Dashboard } from './Dashboard';
@@ -28,8 +28,11 @@ function App() {
   }, []);
 
   const login = async () => {
+    const credential = await chrome.runtime.sendMessage({ type: 'APPLYAI_SIGN_IN' }) as { idToken?: string; accessToken?: string; error?: string };
+    if (credential.error) throw new Error(credential.error);
+    if (!credential.idToken || !credential.accessToken) throw new Error('Google sign-in did not return an authentication token.');
     const { auth } = await getFirebaseServices();
-    await signInWithPopup(auth, new GoogleAuthProvider());
+    await signInWithCredential(auth, GoogleAuthProvider.credential(credential.idToken, credential.accessToken));
   };
   const logout = async () => {
     const { auth } = await getFirebaseServices();
