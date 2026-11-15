@@ -11,7 +11,7 @@
 | Form access | Chrome content scripts + DOM APIs | Detect, inspect and fill application fields on user activation |
 | Workflow | TypeScript state machine | Extract, validate, review, match, fill and track |
 | Hybrid AI | Firebase AI Logic Web SDK | On-device and consent-based cloud inference |
-| On-device model | Gemini Nano (supported Chrome devices) | Private semantic field matching and grounded drafting |
+| On-device model | Chrome Prompt API through Firebase AI Logic | Private semantic field matching and grounded drafting on supported Chrome Desktop |
 | Cloud model | Gemini via Firebase AI Logic | Explicitly approved fallback for complex tasks |
 | Validation | Zod | Validate extracted profile and AI output schemas |
 | Resume parsing | PDF.js (`pdfjs-dist`) | Extract text from uploaded PDF |
@@ -19,12 +19,13 @@
 | Cloud database | Cloud Firestore | Store user-scoped structured profile metadata and approved application records |
 | Cloud authentication | Firebase Authentication | Sign-in and identity for profile and file access |
 | Cloud protection | Firebase App Check + Firestore Security Rules + Storage Rules | Protect cloud access and isolate user records and files |
-| Testing | Vitest + Playwright | Unit tests and browser-extension/form workflows |
+| Verification | TypeScript + Vite build and controlled test form | Type checking, production bundle, and manual extension workflow checks |
 
 ## Extension components
 
 - **Content script:** On explicit user activation, read the active supported job page DOM, extract normalized fields, and fill validated answers. Handle page-specific dynamic form events where supported.
 - **Background service worker:** Coordinate messages, supported tab access, and lifecycle events. Do not assume a permanently running background process.
+- **Authentication:** Use Firebase Authentication Google sign-in through a Manifest V3 offscreen document and a hosted helper page; do not call popup sign-in directly from an extension page.
 - **Dashboard:** Provide sign-in, PDF upload, extraction progress, and editable profile sections: skills, university, name, LinkedIn, portfolio, email, phone, graduation date, work experience, projects, and achievements.
 - **Side panel or popup:** Display detected application fields, proposed answers, edit/review controls, inference mode, consent prompts, and history. Host the AI workflow in a supported extension document context rather than assuming it can run in a service worker.
 - **Resume pipeline:** Upload the source PDF to a user-scoped Cloud Storage path; extract PDF text with PDF.js; structure text into profile fields; validate and show fields for correction before saving.
@@ -65,7 +66,7 @@ Exact facts such as name, email, phone, university, and graduation date should u
 
 - No custom backend is required for the initial prototype; use Firebase client SDKs with strict user-scoped rules.
 - Build sign-in, PDF upload, profile extraction/review/dashboard, and a controlled test form before expanding platform coverage.
-- Validate Firebase AI Logic on-device support in the actual extension context before depending on it in the AI workflow.
+- Validate Firebase AI Logic on-device support in the actual extension context before depending on it in the AI workflow. Current web hybrid inference requires Firebase JS SDK v12.5.0+ and desktop Chrome 139+ with the Prompt API model available.
 - Verify App Check and Firestore/Storage rules in the target extension deployment before enabling cloud features.
 - Pin dependencies at implementation time. Keep the AI provider behind a typed interface so the workflow can be tested without a live model.
 
