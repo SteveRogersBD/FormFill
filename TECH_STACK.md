@@ -79,5 +79,3 @@ Exact facts such as name, email, phone, university, and graduation date should u
 - [Hybrid inference configuration](https://firebase.google.com/docs/ai-logic/hybrid/web/configuration-options)
 - [Structured outputs](https://firebase.google.com/docs/ai-logic/hybrid/web/generate-structured-output)
 - [Firebase Hybrid AI Hackathon](https://firebasehybridaihackathon.devpost.com/)
-
-
