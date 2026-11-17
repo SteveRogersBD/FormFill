@@ -21,13 +21,13 @@ export interface ApplicationRecord {
 
 export async function saveResume(file: File, profile: ResumeProfile, uid: string) {
   const { db, storage } = await getFirebaseServices();
-  const [{ doc, setDoc }, { getDownloadURL, ref, uploadBytes }] = await Promise.all([import('firebase/firestore'), import('firebase/storage')]);
+  const [{ doc, setDoc }, { ref, uploadBytes }] = await Promise.all([import('firebase/firestore'), import('firebase/storage')]);
   const safeName = file.name.replace(/[^\w.-]/g, '_');
   const path = `resumes/${uid}/${Date.now()}-${safeName}`;
   await uploadBytes(ref(storage, path), file, { contentType: 'application/pdf' });
   const savedProfile = resumeProfileSchema.parse({ ...profile, resumePath: path, updatedAt: Date.now() });
   await setDoc(doc(db, 'users', uid, 'profile', 'current'), savedProfile);
-  return { profile: savedProfile, downloadUrl: await getDownloadURL(ref(storage, path)) };
+  return savedProfile;
 }
 
 export async function saveProfile(profile: ResumeProfile, uid: string) {
