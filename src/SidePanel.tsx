@@ -99,10 +99,10 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   };
 
   return <main className="panel-shell">
-    <header className="panel-header"><a className="brand" href="dashboard.html" target="_blank"><span className="brand-mark small">A</span><span>apply<span className="brand-accent">ai</span></span></a><button className="button quiet compact" onClick={onLogout}>Sign out</button></header>
+    <header className="panel-header"><a className="brand" href="dashboard.html" target="_blank"><span className="brand-mark small">A</span><span>apply<span className="brand-accent">ai</span></span></a><a className="button quiet compact" href="dashboard.html" target="_blank">{profile.updatedAt ? 'Edit profile' : 'Set up profile'}</a><button className="button quiet compact" onClick={onLogout}>Sign out</button></header>
     <section className="panel-intro"><p className="eyebrow">APPLICATION ASSISTANT</p><h1>Let’s fill this out.</h1><p className="muted">Your profile stays yours. You choose what gets filled.</p></section>
     {error && <div className="notice error compact-notice" role="alert">{error}</div>}{notice && <div className="notice success compact-notice" role="status">{notice}</div>}
-    {!loading && !profile.updatedAt && <div className="notice info compact-notice">Set up your resume profile first. <a href="dashboard.html" target="_blank">Open dashboard ↗</a></div>}
+    {!loading && !profile.updatedAt && <div className="notice info compact-notice">Set up your resume profile before scanning. Use <strong>Set up profile</strong> above.</div>}
     <button className="button primary wide scan-button" onClick={scanPage} disabled={loading || busy || !profile.updatedAt}>{busy ? 'Working…' : scan ? 'Scan page again' : 'Scan this application'}</button>
     {suggestions.length > 0 && <section className="panel-section"><div className="panel-section-heading"><h2>Review answers</h2><span>{suggestions.length} fields</span></div>{inferenceSource && <div className="inference-badge">✦ {inferenceSource}</div>}<div className="answer-list">{suggestions.map(({ field, suggested }) => {
       const sensitive = isSensitiveField(field.label);
