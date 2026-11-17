@@ -49,4 +49,9 @@ describe('extractProfileFromText', () => {
   it('rejects textless resumes so missing facts are not guessed', () => {
     expect(() => extractProfileFromText('  ')).toThrow('no selectable text');
   });
+
+  it('does not treat a graduation year range as a phone number', () => {
+    const profile = extractProfileFromText('Jane Doe\njane@example.com\nEDUCATION\nState University\n2020 - 2024');
+    expect(profile.phone).toBe('');
+  });
 });
