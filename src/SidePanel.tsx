@@ -92,6 +92,28 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     } finally { setBusy(false); }
   };
 
+  const createCoverLetterDraft = async (cloud: boolean) => {
+    if (!coverLetterField || !jobDescription.trim() || (cloud && (!coverLetterCloudConsent || !firebaseAppCheckReady))) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const { draftCoverLetterInCloud, draftCoverLetterOnDevice } = await import('./ai');
+      const result = cloud
+        ? await draftCoverLetterInCloud(profile, jobDescription)
+        : await draftCoverLetterOnDevice(profile, jobDescription);
+      setCoverLetterDraft(result.letter);
+      setCoverLetterSource(result.source === 'ON_DEVICE' ? 'On-device AI' : 'Cloud AI (approved)');
+      setNotice('Draft ready. Review and edit it before using it in the application.');
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not draft a cover letter. You can still write your answer manually.');
+    } finally { setBusy(false); }
+  };
+
+  const useCoverLetterDraft = () => {
+    if (!coverLetterField || !coverLetterDraft.trim()) return;
+    setValues((current) => ({ ...current, [coverLetterField.id]: coverLetterDraft.trim() }));
+    setNotice('Draft added to the cover-letter answer. Review it, then fill the application.');
+  };
+
   const confirmSubmitted = async () => {
     if (!scan) return;
     setBusy(true); setError('');
