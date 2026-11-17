@@ -36,6 +36,6 @@ export function findProfileValue(label: string, profile: import('./profile').Res
 }
 
 export function isSensitiveField(label: string): boolean {
-  return /salary|compensation|sponsorship|visa|work authorization|authorized to work|criminal|disability|gender|race|ethnicity/i.test(label);
+  return /salary|compensation|sponsorship|visa|work authorization|authorized to work|citizenship|citizen|background check|security clearance|relocat|criminal|disability|medical|health|veteran|military|gender|race|ethnicity|sexual orientation|consent|certify|attest|terms and conditions/i.test(label);
 }
 
