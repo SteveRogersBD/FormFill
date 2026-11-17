@@ -1,12 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
-import { findProfileValue, isSensitiveField } from './fields';
+import { findProfileValue, isSensitiveField, type DetectedField } from './fields';
 import { listApplications, loadProfile, saveApplication, type ApplicationRecord } from './data';
 import { emptyProfile, type ResumeProfile } from './profile';
 import { firebaseAppCheckReady } from './firebase';
 
-interface PageField { id: string; label: string; type: string; required: boolean; options: string[]; selector: string; }
-interface PageScan { fields: PageField[]; title: string; url: string; }
+interface PageScan { fields: DetectedField[]; title: string; url: string; }
 
 async function scanActivePage(): Promise<PageScan> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
