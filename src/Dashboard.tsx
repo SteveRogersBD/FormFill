@@ -45,7 +45,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
   const save = async () => {
     setWorking(true); setError(''); setMessage('');
     try {
-      const saved = file ? (await saveResume(file, profile, user.uid)).profile : await saveProfile(profile, user.uid);
+      const saved = file ? await saveResume(file, profile, user.uid) : await saveProfile(profile, user.uid);
       setProfile(saved); setFile(null); setMessage('Your reviewed profile is saved to Firebase.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save your profile. Check your Firebase configuration and rules.'); }
     finally { setWorking(false); }
