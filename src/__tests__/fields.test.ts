@@ -8,6 +8,8 @@ const profile = {
   email: 'jordan@example.com',
   phone: '+1 555 010 0100',
   linkedin: 'linkedin.com/in/jordan-lee',
+  portfolio: 'jordanlee.dev',
+  university: 'State University',
   skills: ['TypeScript', 'React'],
   workExperience: ['Built reliable onboarding flows.'],
   targetRole: 'Product Designer',
@@ -25,6 +27,15 @@ describe('findProfileValue', () => {
   it('normalizes social links and formats list answers', () => {
     expect(findProfileValue('LinkedIn profile', profile)).toBe('https://linkedin.com/in/jordan-lee');
     expect(findProfileValue('What skills would you bring?', profile)).toBe('TypeScript, React');
+  });
+
+  it('matches Greenhouse-style contact and education labels', () => {
+    expect(findProfileValue('First Name*', profile)).toBe('Jordan');
+    expect(findProfileValue('Last Name*', profile)).toBe('Lee');
+    expect(findProfileValue('Email*', profile)).toBe('jordan@example.com');
+    expect(findProfileValue('Phone*', profile)).toBe('+1 555 010 0100');
+    expect(findProfileValue('Portfolio Website', profile)).toBe('https://jordanlee.dev');
+    expect(findProfileValue('University or college', profile)).toBe('State University');
   });
 
   it('uses user-entered preferences and leaves unknown values blank', () => {
