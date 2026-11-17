@@ -75,7 +75,8 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       if (!tab?.id) throw new Error('The application tab is no longer available.');
       const safeValues = Object.fromEntries(Object.entries(values).filter(([id, value]) => {
         const field = scan.fields.find((candidate) => candidate.id === id);
-        return Boolean(value.trim()) && (!field || !isSensitiveField(field.label) || confirmed[id]);
+        return field !== undefined && !['file', 'password', 'date', 'number', 'select-multiple'].includes(field.type)
+          && Boolean(value.trim()) && (!isSensitiveField(field.label) || confirmed[id]);
       }));
       const result = await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_FILL_FIELDS', values: safeValues }) as { filled: number };
       setFilled(result.filled > 0);
@@ -142,7 +143,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     <button className="button primary wide scan-button" onClick={scanPage} disabled={loading || busy || !profile.updatedAt}>{busy ? 'Working…' : scan ? 'Scan page again' : 'Scan this application'}</button>
     {suggestions.length > 0 && <section className="panel-section"><div className="panel-section-heading"><h2>Review answers</h2><span>{suggestions.length} fields</span></div>{inferenceSource && <div className="inference-badge">✦ {inferenceSource}</div>}<div className="answer-list">{suggestions.map(({ field, suggested }) => {
       const sensitive = isSensitiveField(field.label);
-      const unsupported = ['file', 'password', 'date', 'number'].includes(field.type);
+      const unsupported = ['file', 'password', 'date', 'number', 'select-multiple'].includes(field.type);
       return <div className="answer-row" key={field.id}><label className="answer-label" htmlFor={`answer-${field.id}`}>{field.label || 'Unlabeled field'}{field.required && <i>Required</i>}</label>
         {['radio', 'select'].includes(field.type) && field.options.length > 0 ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">Choose an option</option>{field.options.map((option) => <option key={option}>{option}</option>)}</select>
           : field.type === 'checkbox' ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">Leave unchanged</option><option value="true">Check this box</option></select>
