@@ -1,5 +1,7 @@
+import { readFile } from 'node:fs/promises';
+import * as pdfjs from 'pdfjs-dist';
 import { describe, expect, it } from 'vitest';
-import { extractProfileFromText } from '../resumeParser';
+import { extractProfile, extractProfileFromText } from '../resumeParser';
 
 const resumeText = `
 Jane Doe
@@ -43,6 +45,23 @@ describe('extractProfileFromText', () => {
       workExperience: ['Product Designer at Northstar Studio', 'Led user research and prototyping.'],
       projects: ['Application Tracker', 'Built a job search dashboard.'],
       achievements: ['Design Challenge Winner', 'Recognized for inclusive product design.'],
+    });
+  });
+
+  it('extracts profile details from an actual PDF file', async () => {
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL('../../node_modules/pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;
+    const bytes = await readFile(new URL('./fixtures/sample-resume.pdf', import.meta.url));
+    const file = new File([new Uint8Array(bytes)], 'sample-resume.pdf', { type: 'application/pdf' });
+
+    await expect(extractProfile(file)).resolves.toMatchObject({
+      fullName: 'Riley Example',
+      email: 'riley@example.test',
+      university: 'Example University',
+      graduationDate: 'May 2027',
+      skills: ['TypeScript', 'React', 'Accessibility'],
+      workExperience: ['Designer at Example Studio', 'Led user research and prototyping.'],
+      projects: ['Application Assistant', 'Built a form autofill prototype.'],
+      achievements: ['Design Fellowship'],
     });
   });
 
