@@ -19,7 +19,7 @@ export function findProfileValue(label: string, profile: import('./profile').Res
     [/\b(portfolio|personal website|website|github)\b/, 'portfolio'],
     [/\b(university|college|school|institution)\b/, 'university'],
     [/\b(graduation|degree completion|graduated)\b/, 'graduationDate'],
-    [/\b(target role|desired role|role you are seeking|position sought)\b/, 'targetRole'],
+    [/\b(target role|desired role|role (?:you are|are you) seeking|position sought)\b/, 'targetRole'],
     [/\b(skills?|technologies?|programming languages?)\b/, 'skills'],
     [/\b(work experience|employment|professional experience)\b/, 'workExperience'],
     [/\bprojects?\b/, 'projects'],
