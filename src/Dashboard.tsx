@@ -23,6 +23,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
     const selected = event.target.files?.[0];
     if (!selected) return;
     setError(''); setMessage('');
+    setFile(null); event.currentTarget.value = '';
     if ((selected.type && selected.type !== 'application/pdf') || !selected.name.toLowerCase().endsWith('.pdf')) { setError('Choose a PDF file.'); return; }
     if (selected.size > 10 * 1024 * 1024) { setError('PDFs must be 10 MB or smaller.'); return; }
     setFile(selected);
