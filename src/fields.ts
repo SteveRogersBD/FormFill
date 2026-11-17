@@ -39,3 +39,7 @@ export function isSensitiveField(label: string): boolean {
   return /salary|compensation|sponsorship|visa|work authorization|authorized to work|citizenship|citizen|background check|security clearance|relocat|criminal|disability|medical|health|veteran|military|gender|race|ethnicity|sexual orientation|consent|certify|attest|terms and conditions/i.test(label);
 }
 
+export function isCoverLetterField(label: string): boolean {
+  return /\bcover letter\b|\bletter of (?:interest|motivation)\b|\bstatement of interest\b/i.test(label);
+}
+
