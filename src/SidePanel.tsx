@@ -47,12 +47,13 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const coverLetterField = scan?.fields.find((field) => isCoverLetterField(field.label) && ['text', 'textarea'].includes(field.type));
   const scanPage = async () => {
     setBusy(true); setError(''); setNotice(''); setFilled(false);
+    setScan(null); setValues({}); setConfirmed({}); setCloudConsent(false); setInferenceSource('');
+    setJobDescription(''); setCoverLetterDraft(''); setCoverLetterSource(''); setCoverLetterCloudConsent(false);
     try {
       const result = await scanActivePage(); setScan(result);
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
       setValues(Object.fromEntries(result.fields.map((field) => [field.id, findProfileValue(field.label, profile) ?? ''])));
-      setJobDescription(''); setCoverLetterDraft(''); setCoverLetterSource(''); setCoverLetterCloudConsent(false);
       const pageType = result.platform === 'greenhouse' ? ' on this Greenhouse application' : '';
       setNotice(result.fields.length ? `Found ${result.fields.length} fields${pageType}. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not inspect this page.'); }
