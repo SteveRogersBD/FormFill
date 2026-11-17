@@ -28,6 +28,7 @@
 - **Authentication:** Use Firebase Authentication Google sign-in through a Manifest V3 offscreen document and a hosted helper page; do not call popup sign-in directly from an extension page.
 - **Dashboard:** Provide sign-in, PDF upload, extraction progress, and editable profile sections: skills, university, name, LinkedIn, portfolio, email, phone, graduation date, work experience, projects, and achievements, plus a user-entered target role.
 - **Side panel or popup:** Display detected application fields, proposed answers, edit/review controls, inference mode, consent prompts, and history. Host the AI workflow in a supported extension document context rather than assuming it can run in a service worker.
+- **Cover-letter drafting:** When a supported form has a cover-letter field, accept a pasted job description and produce a profile-grounded draft for user review; place it in the form only after the user chooses to do so.
 - **Resume pipeline:** Upload the source PDF to a user-scoped Cloud Storage path; extract PDF text with PDF.js; structure text into profile fields; validate and show fields for correction before saving.
 - **Cloud data layer:** Encapsulate Firebase Authentication, Firestore profile/application records, and Cloud Storage resume operations. Treat the user's reviewed profile as the source of truth for autofill.
 
@@ -42,6 +43,8 @@ Use a grounded workflow:
 5. Retrieve relevant resume evidence or approved answers for ambiguous and open-ended fields.
 6. Use the on-device model for structured, evidence-grounded mappings or drafts when available; cloud inference requires explanation and explicit consent.
 7. Validate output against the expected schema and allowed field IDs, then fill or flag fields for review.
+
+Cover-letter drafts use the pasted job description and relevant reviewed career facts. Exclude direct contact details, reject ungrounded claims, and require review before writing the draft into the page. Cloud cover-letter generation has its own consent step.
 
 Exact facts such as name, email, phone, university, and graduation date should use direct profile lookup. Start with structured metadata and local keyword retrieval; a vector database is not required for the prototype. Never invent facts or execute model-generated code. Use typed output contracts; do not depend on native on-device function calling.
 
