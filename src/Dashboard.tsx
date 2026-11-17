@@ -23,7 +23,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
     const selected = event.target.files?.[0];
     if (!selected) return;
     setError(''); setMessage('');
-    if (selected.type !== 'application/pdf' || !selected.name.toLowerCase().endsWith('.pdf')) { setError('Choose a PDF file.'); return; }
+    if ((selected.type && selected.type !== 'application/pdf') || !selected.name.toLowerCase().endsWith('.pdf')) { setError('Choose a PDF file.'); return; }
     if (selected.size > 10 * 1024 * 1024) { setError('PDFs must be 10 MB or smaller.'); return; }
     setFile(selected);
     setWorking(true);
@@ -81,7 +81,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
       {error && <div className="notice error" role="alert">{error}</div>}{message && <div className="notice success" role="status">{message}</div>}
       <div className="dashboard-grid">
         <section className="card resume-card"><div className="section-heading"><div><p className="eyebrow">01 · START HERE</p><h2>Your resume</h2></div><span className="icon-badge">↥</span></div>
-          <label className="upload-zone"><input type="file" accept="application/pdf,.pdf" onChange={chooseResume} /><span className="upload-icon">↑</span><strong>{working ? 'Reading your resume…' : file ? file.name : 'Drop in your PDF resume'}</strong><span className="muted small-text">or click to browse · PDF up to 10 MB</span></label>
+          <label className="upload-zone"><input type="file" accept="application/pdf,.pdf" disabled={loading || working} onChange={chooseResume} /><span className="upload-icon">↑</span><strong>{working ? 'Reading your resume…' : file ? file.name : 'Drop in your PDF resume'}</strong><span className="muted small-text">or click to browse · PDF up to 10 MB</span></label>
           {profile.resumePath && !file && <button className="text-button" onClick={openResume}>↗ Open current resume</button>}
           <p className="privacy-note"><span>◈</span> Text extraction happens in your browser. Your PDF is uploaded only when you save.</p>
         </section>
