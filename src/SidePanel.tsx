@@ -1,27 +1,26 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
-import { findProfileValue, isSensitiveField, type DetectedField } from './fields';
+import { findProfileValue, isSensitiveField } from './fields';
 import { listApplications, loadProfile, saveApplication, type ApplicationRecord } from './data';
 import { emptyProfile, type ResumeProfile } from './profile';
 import { firebaseAppCheckReady } from './firebase';
+import type { ApplicationScan } from './applicationPage';
 
-interface PageScan { fields: DetectedField[]; title: string; url: string; }
-
-async function scanActivePage(): Promise<PageScan> {
+async function scanActivePage(): Promise<ApplicationScan> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id || !tab.url || !/^https?:/.test(tab.url)) throw new Error('Open a supported job application page in a regular browser tab first.');
   try {
-    return await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_SCAN_FIELDS' }) as PageScan;
+    return await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_SCAN_FIELDS' }) as ApplicationScan;
   } catch {
     await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
-    return await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_SCAN_FIELDS' }) as PageScan;
+    return await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_SCAN_FIELDS' }) as ApplicationScan;
   }
 }
 
 export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Promise<void> }) {
   const [profile, setProfile] = useState<ResumeProfile>(emptyProfile());
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
-  const [scan, setScan] = useState<PageScan | null>(null);
+  const [scan, setScan] = useState<ApplicationScan | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
   const [confirmed, setConfirmed] = useState<Record<string, boolean>>({});
   const [company, setCompany] = useState('');
@@ -45,10 +44,11 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     setBusy(true); setError(''); setNotice(''); setFilled(false);
     try {
       const result = await scanActivePage(); setScan(result);
-      setCompany(new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? '');
-      setRole(result.title);
+      setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
+      setRole(result.role || result.title);
       setValues(Object.fromEntries(result.fields.map((field) => [field.id, findProfileValue(field.label, profile) ?? ''])));
-      setNotice(result.fields.length ? `Found ${result.fields.length} fields. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
+      const pageType = result.platform === 'greenhouse' ? ' on this Greenhouse application' : '';
+      setNotice(result.fields.length ? `Found ${result.fields.length} fields${pageType}. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not inspect this page.'); }
     finally { setBusy(false); }
   };
