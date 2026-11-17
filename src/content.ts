@@ -1,4 +1,4 @@
-interface PageField { id: string; label: string; type: string; required: boolean; options: string[]; selector: string; }
+import type { DetectedField } from './fields';
 
 function labelFor(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
   const text = [
@@ -12,7 +12,7 @@ function labelFor(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectEl
   return [...new Set(text)].join(' · ');
 }
 
-function scanFields(): PageField[] {
+function scanFields(): DetectedField[] {
   const elements = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')]
     .filter((element) => !element.disabled && element.type !== 'hidden' && element.type !== 'submit' && element.type !== 'button' && element.type !== 'reset');
   const radioGroups = new Map<string, HTMLInputElement[]>();
@@ -22,7 +22,7 @@ function scanFields(): PageField[] {
     }
   }
   const handledGroups = new Set<string>();
-  const fields: PageField[] = [];
+  const fields: DetectedField[] = [];
   for (const element of elements) {
     const groupKey = element instanceof HTMLInputElement && element.type === 'radio' && element.name ? element.name : '';
     if (groupKey && handledGroups.has(groupKey)) continue;
