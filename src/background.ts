@@ -29,14 +29,15 @@ async function ensureOffscreenDocument() {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type !== 'APPLYAI_SIGN_IN') return false;
   (async () => {
-    await ensureOffscreenDocument();
     try {
-      const result = await chrome.runtime.sendMessage({ target: 'offscreen', type: 'APPLYAI_OFFSCREEN_AUTH' });
+      await withTimeout(ensureOffscreenDocument(), 15_000);
+      const result = await withTimeout(chrome.runtime.sendMessage({ target: 'offscreen', type: 'APPLYAI_OFFSCREEN_AUTH' }), 60_000);
       if (result?.error) throw new Error(result.error);
       if (!result?.idToken || !result?.accessToken) throw new Error('Google sign-in did not return usable credentials.');
       sendResponse({ idToken: result.idToken, accessToken: result.accessToken });
     } finally {
-      await chrome.offscreen.closeDocument();
+      const contexts = await chrome.runtime.getContexts({ contextTypes: ['OFFSCREEN_DOCUMENT'] });
+      if (contexts.length) await chrome.offscreen.closeDocument();
     }
   })().catch((error: unknown) => sendResponse({ error: error instanceof Error ? error.message : 'Could not sign in with Google.' }));
   return true;
