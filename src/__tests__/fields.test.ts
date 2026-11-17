@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findProfileValue, isSensitiveField } from '../fields';
+import { findProfileValue, isCoverLetterField, isSensitiveField } from '../fields';
 import { emptyProfile } from '../profile';
 
 const profile = {
@@ -52,5 +52,15 @@ describe('isSensitiveField', () => {
 
   it('does not flag ordinary profile fields', () => {
     expect(isSensitiveField('University')).toBe(false);
+  });
+});
+
+describe('isCoverLetterField', () => {
+  it.each(['Cover letter', 'Letter of interest', 'Letter of motivation', 'Statement of interest'])('%s is a draftable application field', (label) => {
+    expect(isCoverLetterField(label)).toBe(true);
+  });
+
+  it('does not match unrelated fields', () => {
+    expect(isCoverLetterField('Resume/CV')).toBe(false);
   });
 });
