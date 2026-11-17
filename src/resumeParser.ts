@@ -5,9 +5,9 @@ import { emptyProfile, type ResumeProfile } from './profile';
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 const sections: Record<string, keyof Pick<ResumeProfile, 'skills' | 'workExperience' | 'projects' | 'achievements'>> = {
-  skills: 'skills', technologies: 'skills', 'technical skills': 'skills',
-  experience: 'workExperience', employment: 'workExperience', 'work experience': 'workExperience',
-  projects: 'projects', achievements: 'achievements', awards: 'achievements', honors: 'achievements',
+  skills: 'skills', technologies: 'skills', 'technical skills': 'skills', 'core competencies': 'skills', 'skills and tools': 'skills',
+  experience: 'workExperience', employment: 'workExperience', 'work experience': 'workExperience', 'professional experience': 'workExperience', 'work history': 'workExperience', 'career experience': 'workExperience',
+  projects: 'projects', 'personal projects': 'projects', 'selected projects': 'projects', achievements: 'achievements', 'key achievements': 'achievements', awards: 'achievements', honors: 'achievements', 'awards and honors': 'achievements', 'honors and awards': 'achievements',
 };
 
 function cleanLines(text: string) {
@@ -33,7 +33,7 @@ export function extractProfileFromText(text: string): ResumeProfile {
   let inEducation = false;
   const educationLines: string[] = [];
   for (const line of lines) {
-    const heading = line.toLowerCase().replace(/[:\s]+$/, '');
+    const heading = line.toLowerCase().replace(/&/g, 'and').replace(/[:\s]+$/, '').replace(/\s+/g, ' ');
     const section = sections[heading];
     if (section) {
       activeSection = section;
