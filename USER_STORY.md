@@ -42,6 +42,8 @@ As a job seeker, I want the extension to fill out the application using my saved
 - Known facts are filled directly from my approved profile.
 - On-device AI matches unfamiliar field labels to relevant profile information.
 - Open-ended questions use relevant resume details and approved answers to draft truthful responses.
+- When an application requests a cover letter, I can paste its job description and generate a draft grounded in my reviewed profile.
+- Cover-letter drafts stay in the extension for review and editing before I choose to place one in the application field.
 - Unknown facts, work authorization, sponsorship, salary, and other sensitive or consequential answers require my confirmation unless explicitly saved by me.
 - I can review and edit every answer. The extension never submits an application automatically.
 
@@ -63,22 +65,31 @@ As a job seeker, I want a record of my applications, so that I can track progres
 - I can update the status and delete records.
 - Cloud synchronization is optional and stores only approved application metadata.
 
+### US-06 — Draft a tailored cover letter
+
+As a job seeker, I want a cover-letter draft tailored to a job description, so that I can adapt my application faster without inventing career details.
+
+- The feature is offered when ApplyAI detects a cover-letter field on a supported application page.
+- I provide the job description; drafts use relevant details from my reviewed profile and do not invent qualifications or achievements.
+- On-device drafting is offered first when supported. Cloud drafting requires separate, explicit consent.
+- I can review and edit the draft before placing it in the form. ApplyAI never submits it for me.
+
 ## MVP scope
 
 - Chrome desktop extension with sign-in, resume upload, editable profile dashboard, and a side panel or popup for application autofill.
 - Google Authentication, Cloud Storage for original resume PDFs, and Firestore for user profile metadata.
 - One supported ATS platform plus a controlled test form for the hackathon demo.
-- Resume parsing and editable profile dashboard, supported-page form detection, grounded autofill, review, and application history.
+- Resume parsing and editable profile dashboard, supported-page form detection, grounded autofill, review, optional cover-letter drafting, and application history.
 - Firebase AI Logic on-device and consent-based cloud inference.
 
 ## Out of scope for MVP
 
 - Automatic submission, mass applications, or CAPTCHA bypass.
 - Support for every job website or every iframe/custom widget.
-- Automatic resume rewriting or cover letter generation (future features; all generated content would require user review).
+- Automatic resume rewriting (future feature; any generated content would require user review).
 - External email/calendar integrations and advanced cloud analytics.
 
 ## Definition of done
 
-A user can sign in, upload a PDF, review and edit extracted profile fields in the dashboard, open a supported application in Chrome, activate autofill, review and edit proposed answers, fill the form, submit manually, and save a confirmed application record.
+A user can sign in, upload a PDF, review and edit extracted profile fields in the dashboard, open a supported application in Chrome, activate autofill, review and edit proposed answers, optionally draft and review a cover letter, fill the form, submit manually, and save a confirmed application record.
 
