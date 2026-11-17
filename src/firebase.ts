@@ -9,7 +9,7 @@ const firebaseConfig = {
 export const firebaseReady = Object.values(firebaseConfig).every(Boolean);
 const appCheckSiteKey = import.meta.env.VITE_FIREBASE_APPCHECK_SITE_KEY;
 const appCheckDebug = import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG === 'true';
-export const firebaseAppCheckReady = Boolean(appCheckSiteKey);
+export const firebaseAppCheckReady = Boolean(appCheckSiteKey || appCheckDebug);
 
 let services: { auth: import('firebase/auth').Auth; db: import('firebase/firestore').Firestore; storage: import('firebase/storage').FirebaseStorage } | undefined;
 
@@ -20,10 +20,10 @@ export async function getFirebaseServices() {
       import('firebase/app'), import('firebase/auth'), import('firebase/firestore'), import('firebase/storage'),
     ]);
     const app = initializeApp(firebaseConfig);
-    if (appCheckSiteKey) {
+    if (appCheckSiteKey || appCheckDebug) {
       if (appCheckDebug) (globalThis as typeof globalThis & { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
       const { initializeAppCheck, ReCaptchaV3Provider } = await import('firebase/app-check');
-      initializeAppCheck(app, { provider: new ReCaptchaV3Provider(appCheckSiteKey), isTokenAutoRefreshEnabled: true });
+      initializeAppCheck(app, { provider: new ReCaptchaV3Provider(appCheckSiteKey ?? 'debug-only'), isTokenAutoRefreshEnabled: true });
     }
     services = { auth: getAuth(app), db: getFirestore(app), storage: getStorage(app) };
   }
