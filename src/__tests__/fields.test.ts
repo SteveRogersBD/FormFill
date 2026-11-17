@@ -40,6 +40,7 @@ describe('findProfileValue', () => {
 
   it('uses user-entered preferences and leaves unknown values blank', () => {
     expect(findProfileValue('What target role are you seeking?', profile)).toBe('Product Designer');
+    expect(findProfileValue('What role are you seeking?', profile)).toBe('Product Designer');
     expect(findProfileValue('What is your salary expectation?', profile)).toBeUndefined();
     expect(findProfileValue('Tell us your favorite color', profile)).toBeUndefined();
   });
