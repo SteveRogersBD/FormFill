@@ -38,7 +38,7 @@ function scanFields(): DetectedField[] {
     fields.push({
       id,
       label: labelFor(element),
-      type: groupKey ? 'radio' : element instanceof HTMLInputElement ? element.type : element instanceof HTMLSelectElement ? 'select' : 'textarea',
+      type: groupKey ? 'radio' : element instanceof HTMLInputElement ? element.type : element instanceof HTMLSelectElement ? element.multiple ? 'select-multiple' : 'select' : 'textarea',
       required: members.some((member) => member.required || member.getAttribute('aria-required') === 'true'),
       options,
       selector: `[data-applyai-field="${id}"]`,
@@ -77,6 +77,7 @@ function fillFields(values: Record<string, string>) {
       filled += 1;
       continue;
     }
+    if (first instanceof HTMLSelectElement && first.multiple) continue;
     if (first instanceof HTMLInputElement && ['file', 'password', 'number'].includes(first.type)) continue;
     if (first instanceof HTMLSelectElement) {
       const option = [...first.options].find((item) => item.text.trim().toLowerCase() === value.trim().toLowerCase() || item.value.toLowerCase() === value.trim().toLowerCase());
