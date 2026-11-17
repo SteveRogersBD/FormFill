@@ -5,6 +5,7 @@ function labelFor(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectEl
   const text = [
     ...(element.labels ? [...element.labels].map((label) => label.innerText) : []),
     element.getAttribute('aria-label') ?? '',
+    ...(element.getAttribute('aria-labelledby')?.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? '') ?? []),
     element.getAttribute('placeholder') ?? '',
     element.name,
     element.id,
