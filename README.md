@@ -55,7 +55,7 @@ npm run typecheck
 npm run build
 ```
 
-The extension currently uses generic accessible DOM fields and the controlled test form. Complex widgets, cross-origin iframes, and broad ATS-specific support remain outside this prototype.
+Greenhouse hosted job applications on `boards.greenhouse.io` and `job-boards.greenhouse.io` are the first ATS target. ApplyAI reads accessible native form controls there, as it does in the controlled test form. Complex widgets, cross-origin iframes, and resume file uploads require manual handling.
 
 For cloud AI, register the web app with Firebase App Check and configure its reCAPTCHA v3 site key as `VITE_FIREBASE_APPCHECK_SITE_KEY`. For local development only, set `VITE_FIREBASE_APPCHECK_DEBUG=true`, run the extension, and register the generated debug token in Firebase App Check. Never ship the debug setting or token.
 
