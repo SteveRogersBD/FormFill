@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { findProfileValue, isCoverLetterField, isSensitiveField } from './fields';
-import { listApplications, loadProfile, saveApplication, type ApplicationRecord } from './data';
+import { listApplications, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
 import { emptyProfile, type ResumeProfile } from './profile';
 import { firebaseAppCheckReady } from './firebase';
 import type { ApplicationScan } from './applicationPage';
@@ -129,12 +129,18 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     setBusy(true); setError('');
     try {
       const url = new URL(scan.url);
-      await saveApplication(user.uid, { company: company.trim(), role: role.trim(), url: scan.url, status: 'submitted' });
-      setApplications(await listApplications(user.uid)); setNotice(`Saved ${role.trim() || 'this application'} as submitted.`); setFilled(false);
+      const existing = applications.find((application) => application.url === scan.url);
+      if (existing?.status !== 'submitted') {
+        if (existing) await updateApplication(user.uid, existing.id, 'submitted');
+        else await saveApplication(user.uid, { company: company.trim(), role: role.trim(), url: scan.url, status: 'submitted' });
+      }
+      setApplications(await listApplications(user.uid)); setNotice(`${existing ? 'Updated' : 'Saved'} ${role.trim() || 'this application'} as submitted.`); setFilled(false);
       setCompany(url.hostname); setRole('');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save this application.'); }
     finally { setBusy(false); }
   };
+
+  const trackedApplication = scan ? applications.find((application) => application.url === scan.url) : undefined;
 
   return <main className="panel-shell">
     <header className="panel-header"><a className="brand" href="dashboard.html" target="_blank"><span className="brand-mark small">A</span><span>apply<span className="brand-accent">ai</span></span></a><a className="button quiet compact" href="dashboard.html" target="_blank">{profile.updatedAt ? 'Edit profile' : 'Set up profile'}</a><button className="button quiet compact" onClick={onLogout}>Sign out</button></header>
@@ -165,7 +171,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       <button className="text-button cloud-button" onClick={() => createCoverLetterDraft(true)} disabled={busy || !jobDescription.trim() || !coverLetterCloudConsent || !firebaseAppCheckReady}>Draft with cloud AI after approval</button>
       {coverLetterDraft && <><label className="form-field"><span>Review and edit the draft</span><textarea rows={8} value={coverLetterDraft} onChange={(event) => setCoverLetterDraft(event.target.value)} /></label><button className="button primary wide" onClick={useCoverLetterDraft} disabled={busy}>Use draft in application field</button></>}
     </section>}
-    {scan && <section className="confirm-card"><p className="eyebrow">{filled ? 'AFTER YOU SUBMIT' : 'APPLICATION TRACKING'}</p><h2>{filled ? 'Applied? Save it here.' : 'Submitted this application?'}</h2><label className="form-field"><span>Company</span><input value={company} onChange={(event) => setCompany(event.target.value)} /></label><label className="form-field"><span>Role</span><input value={role} onChange={(event) => setRole(event.target.value)} /></label><button className="button secondary wide" onClick={confirmSubmitted} disabled={busy}>I submitted this application</button></section>}
+    {scan && <section className="confirm-card"><p className="eyebrow">{filled ? 'AFTER YOU SUBMIT' : 'APPLICATION TRACKING'}</p><h2>{filled ? 'Applied? Save it here.' : 'Submitted this application?'}</h2><label className="form-field"><span>Company</span><input value={company} onChange={(event) => setCompany(event.target.value)} /></label><label className="form-field"><span>Role</span><input value={role} onChange={(event) => setRole(event.target.value)} /></label><button className="button secondary wide" onClick={confirmSubmitted} disabled={busy || trackedApplication?.status === 'submitted'}>{trackedApplication?.status === 'submitted' ? 'Already saved as submitted' : trackedApplication ? 'Mark this application submitted' : 'I submitted this application'}</button></section>}
     <section className="panel-section recent-applications"><div className="panel-section-heading"><h2>Recent applications</h2><a href="dashboard.html" target="_blank">View all</a></div>{applications.length === 0 ? <p className="empty-state">Your confirmed applications will appear here.</p> : applications.slice(0, 3).map((application) => <div className="mini-application" key={application.id}><span>{application.role || application.company || 'Application'}</span><i>{application.status.replace('_', ' ')}</i></div>)}</section>
   </main>;
 }
