@@ -73,6 +73,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     try {
       const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (!tab?.id) throw new Error('The application tab is no longer available.');
+      if (tab.url !== scan.url) throw new Error('The active application page changed. Scan it again before filling.');
       const safeValues = Object.fromEntries(Object.entries(values).filter(([id, value]) => {
         const field = scan.fields.find((candidate) => candidate.id === id);
         return field !== undefined && !['file', 'password', 'date', 'number', 'select-multiple'].includes(field.type)
