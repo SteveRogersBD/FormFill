@@ -56,6 +56,9 @@ describe('extractProfileFromText', () => {
     await expect(extractProfile(file)).resolves.toMatchObject({
       fullName: 'Riley Example',
       email: 'riley@example.test',
+      phone: '+1 555 010 1234',
+      linkedin: 'https://linkedin.com/in/riley-example',
+      portfolio: 'https://riley.example.test',
       university: 'Example University',
       graduationDate: 'May 2027',
       skills: ['TypeScript', 'React', 'Accessibility'],
