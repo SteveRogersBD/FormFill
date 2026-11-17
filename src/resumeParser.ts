@@ -14,17 +14,7 @@ function cleanLines(text: string) {
   return text.split(/\n+/).map((line) => line.replace(/^[-•*\s]+/, '').trim()).filter(Boolean);
 }
 
-export async function extractProfile(file: File): Promise<ResumeProfile> {
-  const bytes = await file.arrayBuffer();
-  const document = await pdfjs.getDocument({ data: bytes }).promise;
-  const pageTexts: string[] = [];
-  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
-    const page = await document.getPage(pageNumber);
-    const content = await page.getTextContent();
-    pageTexts.push(content.items.map((item) => 'str' in item ? `${item.str}${'hasEOL' in item && item.hasEOL ? '\n' : ' '}` : '').join(''));
-  }
-
-  const text = pageTexts.join('\n');
+export function extractProfileFromText(text: string): ResumeProfile {
   if (!text.trim()) throw new Error('This PDF has no selectable text. It may be scanned; OCR is not included yet. Your file is still selected, so you can enter details manually and save it.');
   const lines = cleanLines(text);
   const profile = emptyProfile();
@@ -64,4 +54,16 @@ export async function extractProfile(file: File): Promise<ResumeProfile> {
   profile.graduationDate = educationLines.join('\n').match(/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[,\s]+20\d{2}\b|\b20\d{2}\b/g)?.at(-1) ?? '';
   profile.skills = [...new Set(profile.skills.flatMap((line) => line.split(/[,|•;]/).map((skill) => skill.trim()).filter(Boolean)))];
   return profile;
+}
+
+export async function extractProfile(file: File): Promise<ResumeProfile> {
+  const bytes = await file.arrayBuffer();
+  const document = await pdfjs.getDocument({ data: bytes }).promise;
+  const pageTexts: string[] = [];
+  for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+    const page = await document.getPage(pageNumber);
+    const content = await page.getTextContent();
+    pageTexts.push(content.items.map((item) => 'str' in item ? `${item.str}${'hasEOL' in item && item.hasEOL ? '\n' : ' '}` : '').join(''));
+  }
+  return extractProfileFromText(pageTexts.join('\n'));
 }
