@@ -20,7 +20,10 @@ export function extractProfileFromText(text: string): ResumeProfile {
   const profile = emptyProfile();
   profile.fullName = lines.find((line) => !/^(resume|curriculum vitae|cv)$/i.test(line) && !line.includes('@') && !/https?:\/\//i.test(line)) ?? '';
   profile.email = text.match(/[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}/)?.[0] ?? '';
-  profile.phone = text.match(/(?:\+?\d[\d\s().-]{7,}\d)/)?.[0]?.trim() ?? '';
+  profile.phone = (text.match(/(?:\+?\d[\d\s().-]{5,}\d)/g) ?? []).find((candidate) => {
+    const digits = candidate.replace(/\D/g, '').length;
+    return digits >= 7 && digits <= 15 && !/\b(?:19|20)\d{2}\s*[-–—]\s*(?:19|20)\d{2}\b/.test(candidate);
+  })?.trim() ?? '';
   profile.linkedin = text.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/(?:in|pub)\/[\w-]+/i)?.[0] ?? '';
   const urls = [...text.matchAll(/https?:\/\/[^\s)>,]+/g)].map((match) => match[0].replace(/[.,;]+$/, ''));
   profile.portfolio = urls.find((url) => !/linkedin\.com/i.test(url)) ?? '';
