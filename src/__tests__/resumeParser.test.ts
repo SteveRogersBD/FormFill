@@ -38,7 +38,7 @@ describe('extractProfileFromText', () => {
       linkedin: 'https://linkedin.com/in/jane-doe',
       portfolio: 'https://janedoe.dev',
       university: 'State University',
-      graduationDate: '2026',
+      graduationDate: 'May 2026',
       skills: ['TypeScript', 'React', 'Accessibility'],
       workExperience: ['Product Designer at Northstar Studio', 'Led user research and prototyping.'],
       projects: ['Application Tracker', 'Built a job search dashboard.'],
