@@ -78,7 +78,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   };
 
   const suggestWithAI = async (cloud: boolean) => {
-    if (!scan) return;
+    if (!scan || (cloud && (!cloudConsent || !firebaseAppCheckReady))) return;
     setBusy(true); setError(''); setNotice('');
     try {
       const { suggestCloudAnswers, suggestOnDeviceAnswers } = await import('./ai');
