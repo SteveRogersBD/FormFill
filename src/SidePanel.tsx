@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
-import { findProfileValue, isSensitiveField } from './fields';
+import { findProfileValue, isCoverLetterField, isSensitiveField } from './fields';
 import { listApplications, loadProfile, saveApplication, type ApplicationRecord } from './data';
 import { emptyProfile, type ResumeProfile } from './profile';
 import { firebaseAppCheckReady } from './firebase';
@@ -32,6 +32,10 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const [filled, setFilled] = useState(false);
   const [cloudConsent, setCloudConsent] = useState(false);
   const [inferenceSource, setInferenceSource] = useState('');
+  const [coverLetterCloudConsent, setCoverLetterCloudConsent] = useState(false);
+  const [jobDescription, setJobDescription] = useState('');
+  const [coverLetterDraft, setCoverLetterDraft] = useState('');
+  const [coverLetterSource, setCoverLetterSource] = useState('');
 
   useEffect(() => {
     Promise.all([loadProfile(user.uid), listApplications(user.uid)]).then(([savedProfile, records]) => {
@@ -40,6 +44,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   }, [user.uid]);
 
   const suggestions = useMemo(() => scan?.fields.map((field) => ({ field, suggested: findProfileValue(field.label, profile) ?? '' })) ?? [], [scan, profile]);
+  const coverLetterField = scan?.fields.find((field) => isCoverLetterField(field.label) && ['text', 'textarea'].includes(field.type));
   const scanPage = async () => {
     setBusy(true); setError(''); setNotice(''); setFilled(false);
     try {
@@ -47,6 +52,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
       setValues(Object.fromEntries(result.fields.map((field) => [field.id, findProfileValue(field.label, profile) ?? ''])));
+      setJobDescription(''); setCoverLetterDraft(''); setCoverLetterSource(''); setCoverLetterCloudConsent(false);
       const pageType = result.platform === 'greenhouse' ? ' on this Greenhouse application' : '';
       setNotice(result.fields.length ? `Found ${result.fields.length} fields${pageType}. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not inspect this page.'); }
