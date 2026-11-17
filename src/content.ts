@@ -1,4 +1,5 @@
 import type { DetectedField } from './fields';
+import { inferApplicationContext, type ApplicationScan } from './applicationPage';
 
 function labelFor(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
   const text = [
@@ -96,7 +97,13 @@ function fillFields(values: Record<string, string>) {
 
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === 'APPLYAI_SCAN_FIELDS') {
-    sendResponse({ fields: scanFields(), title: document.title, url: location.href });
+    const title = document.title;
+    sendResponse({
+      fields: scanFields(),
+      title,
+      url: location.href,
+      ...inferApplicationContext(location.hostname, title, document.querySelector('h1')?.textContent ?? ''),
+    } satisfies ApplicationScan);
   }
   if (message?.type === 'APPLYAI_FILL_FIELDS') {
     sendResponse({ filled: fillFields(message.values ?? {}) });
