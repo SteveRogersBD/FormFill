@@ -54,4 +54,29 @@ describe('extractProfileFromText', () => {
     const profile = extractProfileFromText('Jane Doe\njane@example.com\nEDUCATION\nState University\n2020 - 2024');
     expect(profile.phone).toBe('');
   });
+
+  it('recognizes common alternate section headings', () => {
+    const profile = extractProfileFromText(`
+      Alex Kim
+      EDUCATION
+      City Institute
+      CORE COMPETENCIES
+      TypeScript, React
+      PROFESSIONAL EXPERIENCE
+      Designer at Northstar
+      WORK HISTORY
+      Led research studies.
+      PERSONAL PROJECTS
+      Job Search Tracker
+      AWARDS & HONORS
+      Design Fellowship
+    `);
+
+    expect(profile).toMatchObject({
+      skills: ['TypeScript', 'React'],
+      workExperience: ['Designer at Northstar', 'Led research studies.'],
+      projects: ['Job Search Tracker'],
+      achievements: ['Design Fellowship'],
+    });
+  });
 });
