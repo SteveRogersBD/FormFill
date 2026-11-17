@@ -1,6 +1,7 @@
 import { getAI, getGenerativeModel, GoogleAIBackend, InferenceMode } from 'firebase/ai';
 import { getApp } from 'firebase/app';
 import { z } from 'zod';
+import { isSensitiveField } from './fields';
 import type { ResumeProfile } from './profile';
 
 const modelOutputSchema = z.object({
@@ -25,7 +26,7 @@ function profileEvidence(label: string, profile: ResumeProfile) {
 }
 
 function makePrompt(fields: AIField[], profile: ResumeProfile, cloud: boolean) {
-  const answerable = fields.filter((field) => ['text', 'textarea', 'email', 'tel', 'url', 'select-one', 'select'].includes(field.type) && !/salary|compensation|sponsorship|visa|work authorization|authorized to work|criminal|disability|gender|race|ethnicity/i.test(field.label)).map(({ id, label, type }) => ({ id, label, type }));
+  const answerable = fields.filter((field) => ['text', 'textarea', 'email', 'tel', 'url', 'select-one', 'select'].includes(field.type) && !isSensitiveField(field.label)).map(({ id, label, type }) => ({ id, label, type }));
   const evidence = cloud
     ? answerable.map((field) => ({ fieldId: field.id, facts: profileEvidence(field.label, profile) }))
     : profile;
@@ -48,6 +49,6 @@ export async function suggestCloudAnswers(fields: AIField[], profile: ResumeProf
 function validateAnswers(text: string, fields: AIField[]) {
   const jsonText = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
   const parsed = modelOutputSchema.parse(JSON.parse(jsonText));
-  const allowed = new Set(fields.filter((field) => !/salary|compensation|sponsorship|visa|work authorization|authorized to work|criminal|disability|gender|race|ethnicity/i.test(field.label)).map((field) => field.id));
+  const allowed = new Set(fields.filter((field) => !isSensitiveField(field.label)).map((field) => field.id));
   return Object.fromEntries(parsed.answers.filter((answer) => allowed.has(answer.fieldId) && answer.answer.trim()).map((answer) => [answer.fieldId, answer.answer.trim()]));
 }
