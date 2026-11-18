@@ -6,9 +6,16 @@ import { emptyProfile, type ResumeProfile } from './profile';
 import { firebaseAppCheckReady } from './firebase';
 import type { ApplicationScan } from './applicationPage';
 
+async function getActiveApplicationTab() {
+  const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+  if (!tab?.id) throw new Error('Could not find the active Chrome tab. Keep the job application open and try again.');
+  if (!tab.url) throw new Error('ApplyAI needs access to this site. In Chrome, open ApplyAI’s toolbar menu and allow access to the current site, then scan again.');
+  if (!/^https?:/.test(tab.url)) throw new Error('Open a job application in a regular HTTP or HTTPS tab before scanning.');
+  return tab;
+}
+
 async function scanActivePage(): Promise<ApplicationScan> {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  if (!tab?.id || !tab.url || !/^https?:/.test(tab.url)) throw new Error('Open a supported job application page in a regular browser tab first.');
+  const tab = await getActiveApplicationTab();
   try {
     return await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_SCAN_FIELDS' }) as ApplicationScan;
   } catch {
@@ -71,8 +78,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     if (!scan) return;
     setBusy(true); setError('');
     try {
-      const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-      if (!tab?.id) throw new Error('The application tab is no longer available.');
+      const tab = await getActiveApplicationTab();
       if (tab.url !== scan.url) throw new Error('The active application page changed. Scan it again before filling.');
       const safeValues = Object.fromEntries(Object.entries(values).filter(([id, value]) => {
         const field = scan.fields.find((candidate) => candidate.id === id);
