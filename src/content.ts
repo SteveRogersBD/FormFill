@@ -1,5 +1,21 @@
 import type { DetectedField } from './fields';
-import { inferApplicationContext, type ApplicationScan } from './applicationPage';
+import type { ApplicationScan } from './applicationPage';
+
+function inferContentPageContext(hostname: string, title: string, heading = '') {
+  const host = hostname.toLowerCase();
+  const greenhouse = host === 'boards.greenhouse.io'
+    || host.endsWith('.boards.greenhouse.io')
+    || host === 'job-boards.greenhouse.io'
+    || host.endsWith('.job-boards.greenhouse.io');
+  const cleanTitle = title.trim().replace(/\s*[|–—-]\s*greenhouse\s*$/i, '');
+  const jobTitle = cleanTitle.match(/^(?:job application|application|apply)(?: for)?\s+(.+?)\s+at\s+(.+)$/i);
+
+  return {
+    platform: greenhouse ? 'greenhouse' as const : 'standard' as const,
+    company: greenhouse ? jobTitle?.[2]?.trim() ?? '' : '',
+    role: jobTitle?.[1]?.trim() || heading.trim() || cleanTitle,
+  };
+}
 
 function labelFor(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
   const text = [
@@ -104,7 +120,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       fields: scanFields(),
       title,
       url: location.href,
-      ...inferApplicationContext(location.hostname, title, document.querySelector('h1')?.textContent ?? ''),
+      ...inferContentPageContext(location.hostname, title, document.querySelector('h1')?.textContent ?? ''),
     } satisfies ApplicationScan);
   }
   if (message?.type === 'APPLYAI_FILL_FIELDS') {
