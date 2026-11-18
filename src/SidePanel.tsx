@@ -6,35 +6,15 @@ import { emptyProfile, type ResumeProfile } from './profile';
 import { firebaseAppCheckReady } from './firebase';
 import { hostPermissionPattern, type ApplicationScan } from './applicationPage';
 
-async function requestSiteAccess(tabId: number, pattern?: string): Promise<'pending' | 'granted' | 'denied'> {
-  if (chrome.permissions.addHostAccessRequest) {
-    try {
-      await chrome.permissions.addHostAccessRequest({ tabId, ...(pattern ? { pattern } : {}) });
-      return 'pending';
-    } catch { /* Fall back to the direct permission prompt when available. */ }
-  }
-  if (pattern && await chrome.permissions.request({ origins: [pattern] })) return 'granted';
-  return 'denied';
-}
-
 async function getActiveApplicationTab() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   const tabId = tab?.id;
   const url = tab?.url;
   if (typeof tabId !== 'number') throw new Error('Could not find the active Chrome tab. Keep the job application open and try again.');
-  if (!url) {
-    const access = await requestSiteAccess(tabId);
-    if (access === 'pending') throw new Error('Chrome is requesting access to this site. Approve the request in Chrome, then scan again.');
-    throw new Error('ApplyAI could not read this page address. Allow site access in Chrome, then scan again.');
-  }
+  if (!url) throw new Error('ApplyAI could not read this page address. Close and reopen the side panel from the ApplyAI toolbar icon on this tab, then scan again.');
   if (!/^https?:/.test(url)) throw new Error('Open a job application in a regular HTTP or HTTPS tab before scanning.');
   const pattern = hostPermissionPattern(url);
-  if (!await chrome.permissions.contains({ origins: [pattern] })) {
-    const access = await requestSiteAccess(tabId, pattern);
-    if (access === 'pending') throw new Error('Chrome is requesting access to this site. Approve the request in Chrome, then scan again.');
-    if (access !== 'granted') throw new Error('ApplyAI needs access to this site to scan it. Allow access in Chrome, then try again.');
-  }
-  return { ...tab, id: tabId, url };
+  return { ...tab, id: tabId, url, pattern, hasSiteAccess: await chrome.permissions.contains({ origins: [pattern] }) };
 }
 
 async function scanActivePage(): Promise<ApplicationScan> {
@@ -59,6 +39,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [siteAccessRequest, setSiteAccessRequest] = useState<{ pattern: string; hostname: string } | null>(null);
   const [filled, setFilled] = useState(false);
   const [cloudConsent, setCloudConsent] = useState(false);
   const [inferenceSource, setInferenceSource] = useState('');
@@ -87,6 +68,13 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     setScan(null); setValues({}); setConfirmed({}); setCloudConsent(false); setInferenceSource('');
     setJobDescription(''); setCoverLetterDraft(''); setCoverLetterSource(''); setCoverLetterCloudConsent(false);
     try {
+      const tab = await getActiveApplicationTab();
+      if (!tab.hasSiteAccess) {
+        setSiteAccessRequest({ pattern: tab.pattern, hostname: new URL(tab.url).hostname });
+        setNotice('Approve site access below. Chrome will show its permission prompt.');
+        return;
+      }
+      setSiteAccessRequest(null);
       const result = await scanActivePage(); setScan(result);
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
@@ -95,6 +83,21 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       setNotice(result.fields.length ? `Found ${result.fields.length} fields${pageType}. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not inspect this page.'); }
     finally { setBusy(false); }
+  };
+
+  const grantSiteAccess = async () => {
+    if (!siteAccessRequest) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      // Invoke Chrome's origin-specific permission prompt directly from this button click.
+      const granted = await chrome.permissions.request({ origins: [siteAccessRequest.pattern] });
+      if (!granted) throw new Error(`Chrome did not grant ApplyAI access to ${siteAccessRequest.hostname}. You can try again or review site access in Chrome settings.`);
+      setSiteAccessRequest(null);
+      setNotice(`Access granted for ${siteAccessRequest.hostname}. Scanning the application…`);
+      await scanPage();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : 'Could not request access to this site.');
+    } finally { setBusy(false); }
   };
 
   const fillPage = async () => {
@@ -177,6 +180,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     {error && <div className="notice error compact-notice" role="alert">{error}</div>}{notice && <div className="notice success compact-notice" role="status">{notice}</div>}
     {!loading && !profile.updatedAt && <div className="notice info compact-notice">Set up your resume profile before scanning. Use <strong>Set up profile</strong> above, then <button className="text-button" onClick={refreshProfile}>refresh the profile here</button>.</div>}
     <button className="button primary wide scan-button" onClick={scanPage} disabled={loading || busy || !profile.updatedAt}>{busy ? 'Working…' : scan ? 'Scan page again' : 'Scan this application'}</button>
+    {siteAccessRequest && <section className="panel-section site-access-card"><p className="field-hint">ApplyAI needs permission to read this application page on <strong>{siteAccessRequest.hostname}</strong>.</p><button className="button secondary wide" onClick={grantSiteAccess} disabled={busy}>Allow access to {siteAccessRequest.hostname}</button><p className="field-hint">Chrome will ask you to approve access to this site only.</p></section>}
     {suggestions.length > 0 && <section className="panel-section"><div className="panel-section-heading"><h2>Review answers</h2><span>{suggestions.length} fields</span></div>{inferenceSource && <div className="inference-badge">✦ {inferenceSource}</div>}<div className="answer-list">{suggestions.map(({ field, suggested }) => {
       const sensitive = isSensitiveField(field.label);
       const unsupported = ['file', 'password', 'date', 'number', 'select-multiple'].includes(field.type);
