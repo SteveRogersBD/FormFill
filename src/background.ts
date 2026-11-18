@@ -10,7 +10,8 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 
 chrome.action.onClicked.addListener((tab) => {
   if (typeof tab.id !== 'number') return;
-  const tabContext = { tabId: tab.id, url: tab.url ?? '' };
+  const origin = tab.url && /^https?:/.test(tab.url) ? new URL(tab.url).origin : '';
+  const tabContext = { tabId: tab.id, origin };
   // Open directly in the click handler so Chrome recognizes its user gesture.
   void Promise.all([
     chrome.storage.session.set({ applyAiActiveTab: tabContext }),

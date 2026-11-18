@@ -11,8 +11,8 @@ async function getActiveApplicationTab() {
   const tabId = tab?.id;
   if (typeof tabId !== 'number') throw new Error('Could not find the active Chrome tab. Keep the job application open and try again.');
   const { applyAiActiveTab } = await chrome.storage.session.get('applyAiActiveTab');
-  const actionContext = applyAiActiveTab as { tabId?: number; url?: string } | undefined;
-  const url = tab.url || (actionContext?.tabId === tabId ? actionContext.url : undefined);
+  const actionContext = applyAiActiveTab as { tabId?: number; origin?: string } | undefined;
+  const url = tab.url || (actionContext?.tabId === tabId ? actionContext.origin : undefined);
   if (!url) throw new Error('ApplyAI could not read this page address. Click the ApplyAI toolbar icon while this job page is active, then scan again.');
   if (!/^https?:/.test(url)) throw new Error('Open a job application in a regular HTTP or HTTPS tab before scanning.');
   const pattern = hostPermissionPattern(url);
