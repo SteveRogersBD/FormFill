@@ -44,6 +44,10 @@ The Vite server gives you the dashboard for UI work. For the extension, run `npm
 4. Open the demo form at `https://<project-id>.web.app/test-form.html` or from the Vite server. Click the extension icon to open the side panel, scan, edit suggestions, and fill. If a cover-letter field is detected, paste the job description to draft a letter on-device; cloud drafting requires its separate consent checkbox. Review and edit the draft before placing it in the form. Sensitive fields stay blank until you enter and confirm them. The extension never submits the form.
 5. After manually submitting a real application, use **I submitted this application** to save it. The dashboard lets you change status or delete the record.
 
+## Site access
+
+On the first scan for a site, ApplyAI asks Chrome for access to that site's origin only. Approve the request on the job page, then scan again. The permission remains for that site until you revoke it in `chrome://extensions` → **ApplyAI** → **Details** → **Site access**; ApplyAI does not request access to every site.
+
 ## AI behavior
 
 Exact profile matches work without AI. The side panel also offers a local-only AI suggestion action; it requires a supported desktop Chrome version and an available on-device model. If it is unavailable, ApplyAI reports that and deterministic autofill continues to work. Cloud suggestions require the separate consent checkbox and send the form labels plus relevant profile snippets to Firebase AI Logic. Enable AI Logic and configure/enforce Firebase App Check in the Firebase console before using this option. ApplyAI does not switch to cloud automatically.
