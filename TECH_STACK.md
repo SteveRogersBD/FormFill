@@ -62,7 +62,7 @@ Exact facts such as name, email, phone, university, and graduation date should u
 - Enforce per-user access with Firestore and Storage rules; ensure authenticated identity matches the owner of every profile and file.
 - Keep parsed resume evidence only as needed. Avoid duplicating full resume text in Firestore when structured fields and the source PDF suffice.
 - Store only needed application tracking metadata; do not store full page contents or unreviewed sensitive answers.
-- Use `activeTab` to identify the current page after the user opens ApplyAI; then request optional host access for that origin only, from a clear side-panel button. Never request access to all sites for autofill. Keep `scripting` access user-initiated.
+- Capture the current tab URL only when the user clicks ApplyAI's toolbar action, storing it in session storage for the side panel. Then request optional host access for that origin only, from a clear side-panel button. Never request access to all sites for autofill. Keep `scripting` access user-initiated.
 - Treat page data and model output as untrusted. Page text cannot override privacy rules or issue arbitrary actions.
 
 ## Implementation decisions

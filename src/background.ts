@@ -8,8 +8,14 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
 
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+chrome.action.onClicked.addListener((tab) => {
+  if (typeof tab.id !== 'number') return;
+  const tabContext = { tabId: tab.id, url: tab.url ?? '' };
+  // Open directly in the click handler so Chrome recognizes its user gesture.
+  void Promise.all([
+    chrome.storage.session.set({ applyAiActiveTab: tabContext }),
+    chrome.sidePanel.open({ tabId: tab.id }),
+  ]).catch(() => undefined);
 });
 
 async function ensureOffscreenDocument() {

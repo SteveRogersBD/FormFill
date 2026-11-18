@@ -9,9 +9,11 @@ import { hostPermissionPattern, type ApplicationScan } from './applicationPage';
 async function getActiveApplicationTab() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   const tabId = tab?.id;
-  const url = tab?.url;
   if (typeof tabId !== 'number') throw new Error('Could not find the active Chrome tab. Keep the job application open and try again.');
-  if (!url) throw new Error('ApplyAI could not read this page address. Close and reopen the side panel from the ApplyAI toolbar icon on this tab, then scan again.');
+  const { applyAiActiveTab } = await chrome.storage.session.get('applyAiActiveTab');
+  const actionContext = applyAiActiveTab as { tabId?: number; url?: string } | undefined;
+  const url = tab.url || (actionContext?.tabId === tabId ? actionContext.url : undefined);
+  if (!url) throw new Error('ApplyAI could not read this page address. Click the ApplyAI toolbar icon while this job page is active, then scan again.');
   if (!/^https?:/.test(url)) throw new Error('Open a job application in a regular HTTP or HTTPS tab before scanning.');
   const pattern = hostPermissionPattern(url);
   return { ...tab, id: tabId, url, pattern, hasSiteAccess: await chrome.permissions.contains({ origins: [pattern] }) };

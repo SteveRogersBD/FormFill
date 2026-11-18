@@ -3,7 +3,7 @@
   "name": "ApplyAI",
   "version": "0.1.0",
   "description": "Review your resume profile and fill supported job applications.",
-  "permissions": ["activeTab", "scripting", "sidePanel", "offscreen"],
+  "permissions": ["activeTab", "scripting", "sidePanel", "offscreen", "storage"],
   "optional_host_permissions": ["http://*/*", "https://*/*"],
   "host_permissions": [
     "https://*.googleapis.com/*",
