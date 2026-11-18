@@ -46,7 +46,7 @@ The Vite server gives you the dashboard for UI work. For the extension, run `npm
 
 ## Site access
 
-Open ApplyAI from its toolbar icon while the job page is active. On the first scan for a site, ApplyAI shows an **Allow access to [site]** button in its side panel. Click it, approve Chrome's permission prompt, and ApplyAI scans the page. The permission remains for that site until you revoke it in `chrome://extensions` → **ApplyAI** → **Details** → **Site access**. ApplyAI does not request access to every site.
+Open ApplyAI from its toolbar icon while the job page is active. On the first scan for a site, ApplyAI shows an **Allow access to [site]** button in its side panel. Click it, approve Chrome's permission prompt, and ApplyAI scans the page. If the application is embedded from another ATS site, ApplyAI asks separately for that site too. Permissions remain until revoked in `chrome://extensions` → **ApplyAI** → **Details** → **Site access**. ApplyAI does not request access to every site.
 
 ## AI behavior
 

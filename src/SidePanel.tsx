@@ -19,14 +19,46 @@ async function getActiveApplicationTab() {
   return { ...tab, id: tabId, url, pattern, hasSiteAccess: await chrome.permissions.contains({ origins: [pattern] }) };
 }
 
-async function scanActivePage(): Promise<ApplicationScan> {
-  const tab = await getActiveApplicationTab();
+async function scanFrame(tabId: number, frameId: number): Promise<ApplicationScan> {
   try {
-    return await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_SCAN_FIELDS' }) as ApplicationScan;
+    return await chrome.tabs.sendMessage(tabId, { type: 'APPLYAI_SCAN_FIELDS' }, { frameId }) as ApplicationScan;
   } catch {
-    await chrome.scripting.executeScript({ target: { tabId: tab.id }, files: ['content.js'] });
-    return await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_SCAN_FIELDS' }) as ApplicationScan;
+    await chrome.scripting.executeScript({ target: { tabId, frameIds: [frameId] }, files: ['content.js'] });
+    return await chrome.tabs.sendMessage(tabId, { type: 'APPLYAI_SCAN_FIELDS' }, { frameId }) as ApplicationScan;
   }
+}
+
+type ScanAttempt = { scan: ApplicationScan } | { permissionOrigin: string };
+
+async function scanActivePage(tabId: number): Promise<ScanAttempt> {
+  const topScan = await scanFrame(tabId, 0);
+  for (const origin of topScan.applicationFrameOrigins ?? []) {
+    if (!await chrome.permissions.contains({ origins: [hostPermissionPattern(origin)] })) return { permissionOrigin: origin };
+  }
+
+  const injections = await chrome.scripting.executeScript({ target: { tabId, allFrames: true }, files: ['content.js'] });
+  const frameIds = [...new Set(injections.map((injection) => injection.frameId))];
+  const frameScans = await Promise.all(frameIds.map(async (frameId) => ({
+    frameId,
+    scan: await chrome.tabs.sendMessage(tabId, { type: 'APPLYAI_SCAN_FIELDS' }, { frameId }) as ApplicationScan,
+  })));
+  const primary = frameScans.find((frame) => frame.frameId === 0)?.scan ?? topScan;
+  const applicationFrame = frameScans.find((frame) => frame.frameId !== 0 && frame.scan.fields.length > 0);
+  const fields = frameScans.flatMap(({ frameId, scan }) => scan.fields.map((field) => ({
+    ...field,
+    id: `frame-${frameId}-${field.id}`,
+    frameId,
+    frameFieldId: field.id,
+  })));
+  return {
+    scan: {
+      ...primary,
+      fields,
+      platform: applicationFrame?.scan.platform ?? primary.platform,
+      company: applicationFrame?.scan.company || primary.company,
+      role: applicationFrame?.scan.role || primary.role,
+    },
+  };
 }
 
 export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Promise<void> }) {
@@ -77,7 +109,13 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         return;
       }
       setSiteAccessRequest(null);
-      const result = await scanActivePage(); setScan(result);
+      const attempt = await scanActivePage(tab.id);
+      if ('permissionOrigin' in attempt) {
+        setSiteAccessRequest({ pattern: hostPermissionPattern(attempt.permissionOrigin), hostname: new URL(attempt.permissionOrigin).hostname });
+        setNotice('The application is embedded on another site. Approve access to that site to scan its form.');
+        return;
+      }
+      const result = attempt.scan; setScan(result);
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
       setValues(Object.fromEntries(result.fields.map((field) => [field.id, findProfileValue(field.label, profile) ?? ''])));
@@ -108,14 +146,21 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     try {
       const tab = await getActiveApplicationTab();
       if (tab.url !== scan.url) throw new Error('The active application page changed. Scan it again before filling.');
-      const safeValues = Object.fromEntries(Object.entries(values).filter(([id, value]) => {
+      const valuesByFrame = new Map<number, Record<string, string>>();
+      for (const [id, value] of Object.entries(values)) {
         const field = scan.fields.find((candidate) => candidate.id === id);
-        return field !== undefined && !['file', 'password', 'date', 'number', 'select-multiple'].includes(field.type)
-          && Boolean(value.trim()) && (!isSensitiveField(field.label) || confirmed[id]);
-      }));
-      const result = await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_FILL_FIELDS', values: safeValues }) as { filled: number };
-      setFilled(result.filled > 0);
-      setNotice(`Filled ${result.filled} field${result.filled === 1 ? '' : 's'}. Check the application before continuing.`);
+        if (!field || ['file', 'password', 'date', 'number', 'select-multiple'].includes(field.type)
+          || !value.trim() || (isSensitiveField(field.label) && !confirmed[id])) continue;
+        const frameValues = valuesByFrame.get(field.frameId ?? 0) ?? {};
+        frameValues[field.frameFieldId ?? field.id] = value;
+        valuesByFrame.set(field.frameId ?? 0, frameValues);
+      }
+      const results = await Promise.all([...valuesByFrame].map(async ([frameId, frameValues]) =>
+        await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_FILL_FIELDS', values: frameValues }, { frameId }) as { filled: number },
+      ));
+      const filledCount = results.reduce((total, result) => total + result.filled, 0);
+      setFilled(filledCount > 0);
+      setNotice(filledCount ? `Filled ${filledCount} field${filledCount === 1 ? '' : 's'}. Check the application before continuing.` : 'Nothing was filled. Add or edit answers with values, then try again.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not fill this page. Try scanning it again.'); }
     finally { setBusy(false); }
   };

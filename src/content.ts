@@ -32,7 +32,11 @@ function labelFor(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectEl
 
 function scanFields(): DetectedField[] {
   const elements = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')]
-    .filter((element) => !element.disabled && element.type !== 'hidden' && element.type !== 'submit' && element.type !== 'button' && element.type !== 'reset');
+    .filter((element) => {
+      const label = labelFor(element).toLowerCase();
+      return !element.disabled && element.type !== 'hidden' && element.type !== 'submit' && element.type !== 'button' && element.type !== 'reset'
+        && !/\b(search|newsletter|job alert|subscribe)\b/.test(label);
+    });
   const radioGroups = new Map<string, HTMLInputElement[]>();
   for (const element of elements) {
     if (element instanceof HTMLInputElement && element.type === 'radio' && element.name) {
@@ -62,6 +66,19 @@ function scanFields(): DetectedField[] {
     });
   }
   return fields;
+}
+
+function applicationFrameOrigins(): string[] {
+  const knownAtsHost = /(^|\.)(greenhouse\.io|ashbyhq\.com|lever\.co|myworkdayjobs\.com|smartrecruiters\.com|jobvite\.com|icims\.com|bamboohr\.com|workable\.com)$/i;
+  const applicationHint = /greenhouse|ashby|lever|workday|smartrecruiters|jobvite|icims|bamboohr|workable|job.?application|application.?form|apply.?form/i;
+  return [...new Set([...document.querySelectorAll<HTMLIFrameElement>('iframe[src]')].flatMap((frame) => {
+    try {
+      const url = new URL(frame.getAttribute('src') ?? '', location.href);
+      if (!['http:', 'https:'].includes(url.protocol) || url.origin === location.origin) return [];
+      const hint = [frame.id, frame.name, frame.title, url.hostname, url.pathname].join(' ');
+      return knownAtsHost.test(url.hostname) || applicationHint.test(hint) ? [url.origin] : [];
+    } catch { return []; }
+  }))];
 }
 
 function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
@@ -113,18 +130,23 @@ function fillFields(values: Record<string, string>) {
   return filled;
 }
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
-  if (message?.type === 'APPLYAI_SCAN_FIELDS') {
-    const title = document.title;
-    sendResponse({
-      fields: scanFields(),
-      title,
-      url: location.href,
-      ...inferContentPageContext(location.hostname, title, document.querySelector('h1')?.textContent ?? ''),
-    } satisfies ApplicationScan);
-  }
-  if (message?.type === 'APPLYAI_FILL_FIELDS') {
-    sendResponse({ filled: fillFields(message.values ?? {}) });
-  }
-  return true;
-});
+const contentWorld = globalThis as typeof globalThis & { __applyAiPageListenerInstalled?: boolean };
+if (!contentWorld.__applyAiPageListenerInstalled) {
+  contentWorld.__applyAiPageListenerInstalled = true;
+  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+    if (message?.type === 'APPLYAI_SCAN_FIELDS') {
+      const title = document.title;
+      sendResponse({
+        fields: scanFields(),
+        title,
+        url: location.href,
+        applicationFrameOrigins: applicationFrameOrigins(),
+        ...inferContentPageContext(location.hostname, title, document.querySelector('h1')?.textContent ?? ''),
+      } satisfies ApplicationScan);
+    }
+    if (message?.type === 'APPLYAI_FILL_FIELDS') {
+      sendResponse({ filled: fillFields(message.values ?? {}) });
+    }
+    return true;
+  });
+}

@@ -5,6 +5,8 @@ export interface DetectedField {
   required: boolean;
   options: string[];
   selector: string;
+  frameId?: number;
+  frameFieldId?: string;
 }
 
 export function findProfileValue(label: string, profile: import('./profile').ResumeProfile): string | undefined {
