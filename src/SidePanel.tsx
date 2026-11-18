@@ -4,15 +4,36 @@ import { findProfileValue, isCoverLetterField, isSensitiveField } from './fields
 import { listApplications, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
 import { emptyProfile, type ResumeProfile } from './profile';
 import { firebaseAppCheckReady } from './firebase';
-import type { ApplicationScan } from './applicationPage';
+import { hostPermissionPattern, type ApplicationScan } from './applicationPage';
+
+async function requestSiteAccess(tabId: number, pattern?: string): Promise<'pending' | 'granted' | 'denied'> {
+  if (chrome.permissions.addHostAccessRequest) {
+    try {
+      await chrome.permissions.addHostAccessRequest({ tabId, ...(pattern ? { pattern } : {}) });
+      return 'pending';
+    } catch { /* Fall back to the direct permission prompt when available. */ }
+  }
+  if (pattern && await chrome.permissions.request({ origins: [pattern] })) return 'granted';
+  return 'denied';
+}
 
 async function getActiveApplicationTab() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   const tabId = tab?.id;
   const url = tab?.url;
   if (typeof tabId !== 'number') throw new Error('Could not find the active Chrome tab. Keep the job application open and try again.');
-  if (!url) throw new Error('ApplyAI needs access to this site. In Chrome, open ApplyAI’s toolbar menu and allow access to the current site, then scan again.');
+  if (!url) {
+    const access = await requestSiteAccess(tabId);
+    if (access === 'pending') throw new Error('Chrome is asking for access to this site. Approve the request on the job page, then scan again.');
+    throw new Error('ApplyAI could not read this page address. Allow site access in Chrome, then scan again.');
+  }
   if (!/^https?:/.test(url)) throw new Error('Open a job application in a regular HTTP or HTTPS tab before scanning.');
+  const pattern = hostPermissionPattern(url);
+  if (!await chrome.permissions.contains({ origins: [pattern] })) {
+    const access = await requestSiteAccess(tabId, pattern);
+    if (access === 'pending') throw new Error('Chrome is asking for access to this site. Approve the request on the job page, then scan again.');
+    if (access !== 'granted') throw new Error('ApplyAI needs access to this site to scan it. Allow access in Chrome, then try again.');
+  }
   return { ...tab, id: tabId, url };
 }
 
