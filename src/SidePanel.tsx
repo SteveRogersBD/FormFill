@@ -24,14 +24,14 @@ async function getActiveApplicationTab() {
   if (typeof tabId !== 'number') throw new Error('Could not find the active Chrome tab. Keep the job application open and try again.');
   if (!url) {
     const access = await requestSiteAccess(tabId);
-    if (access === 'pending') throw new Error('Chrome is asking for access to this site. Approve the request on the job page, then scan again.');
+    if (access === 'pending') throw new Error('Chrome is requesting access to this site. Approve the request in Chrome, then scan again.');
     throw new Error('ApplyAI could not read this page address. Allow site access in Chrome, then scan again.');
   }
   if (!/^https?:/.test(url)) throw new Error('Open a job application in a regular HTTP or HTTPS tab before scanning.');
   const pattern = hostPermissionPattern(url);
   if (!await chrome.permissions.contains({ origins: [pattern] })) {
     const access = await requestSiteAccess(tabId, pattern);
-    if (access === 'pending') throw new Error('Chrome is asking for access to this site. Approve the request on the job page, then scan again.');
+    if (access === 'pending') throw new Error('Chrome is requesting access to this site. Approve the request in Chrome, then scan again.');
     if (access !== 'granted') throw new Error('ApplyAI needs access to this site to scan it. Allow access in Chrome, then try again.');
   }
   return { ...tab, id: tabId, url };
