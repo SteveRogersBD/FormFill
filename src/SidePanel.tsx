@@ -8,10 +8,12 @@ import type { ApplicationScan } from './applicationPage';
 
 async function getActiveApplicationTab() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
-  if (!tab?.id) throw new Error('Could not find the active Chrome tab. Keep the job application open and try again.');
-  if (!tab.url) throw new Error('ApplyAI needs access to this site. In Chrome, open ApplyAI’s toolbar menu and allow access to the current site, then scan again.');
-  if (!/^https?:/.test(tab.url)) throw new Error('Open a job application in a regular HTTP or HTTPS tab before scanning.');
-  return tab;
+  const tabId = tab?.id;
+  const url = tab?.url;
+  if (typeof tabId !== 'number') throw new Error('Could not find the active Chrome tab. Keep the job application open and try again.');
+  if (!url) throw new Error('ApplyAI needs access to this site. In Chrome, open ApplyAI’s toolbar menu and allow access to the current site, then scan again.');
+  if (!/^https?:/.test(url)) throw new Error('Open a job application in a regular HTTP or HTTPS tab before scanning.');
+  return { ...tab, id: tabId, url };
 }
 
 async function scanActivePage(): Promise<ApplicationScan> {
