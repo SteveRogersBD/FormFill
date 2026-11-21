@@ -149,7 +149,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       const valuesByFrame = new Map<number, Record<string, string>>();
       for (const [id, value] of Object.entries(values)) {
         const field = scan.fields.find((candidate) => candidate.id === id);
-        if (!field || ['file', 'password', 'date', 'number', 'select-multiple'].includes(field.type)
+        if (!field || ['file', 'password', 'select-multiple'].includes(field.type)
           || !value.trim() || (isSensitiveField(field.label) && !confirmed[id])) continue;
         const frameValues = valuesByFrame.get(field.frameId ?? 0) ?? {};
         frameValues[field.frameFieldId ?? field.id] = value;
@@ -230,7 +230,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     {siteAccessRequest && <section className="panel-section site-access-card"><p className="field-hint">ApplyAI needs permission to read this application page on <strong>{siteAccessRequest.hostname}</strong>.</p><button className="button secondary wide" onClick={grantSiteAccess} disabled={busy}>Allow access to {siteAccessRequest.hostname}</button><p className="field-hint">Chrome will ask you to approve access to this site only.</p></section>}
     {suggestions.length > 0 && <section className="panel-section"><div className="panel-section-heading"><h2>Review answers</h2><span>{suggestions.length} fields</span></div>{inferenceSource && <div className="inference-badge">✦ {inferenceSource}</div>}<div className="answer-list">{suggestions.map(({ field, suggested }) => {
       const sensitive = isSensitiveField(field.label);
-      const unsupported = ['file', 'password', 'date', 'number', 'select-multiple'].includes(field.type);
+      const unsupported = ['file', 'password', 'select-multiple'].includes(field.type);
       return <div className="answer-row" key={field.id}><label className="answer-label" htmlFor={`answer-${field.id}`}>{field.label || 'Unlabeled field'}{field.required && <i>Required</i>}</label>
         {['radio', 'select'].includes(field.type) && field.options.length > 0 ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">Choose an option</option>{field.options.map((option) => <option key={option}>{option}</option>)}</select>
           : field.type === 'checkbox' ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">Leave unchanged</option><option value="true">Check this box</option></select>

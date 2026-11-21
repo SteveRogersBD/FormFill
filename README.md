@@ -39,7 +39,7 @@ The Vite server gives you the dashboard for UI work. For the extension, run `npm
 ## 3. Try the prototype
 
 1. Open ApplyAI and sign in with Google.
-2. Upload a text-based PDF resume. The browser extracts a first pass for name, email, phone, links, education, skills, experience, projects, and achievements. Add your target role in the dashboard as a guided profile detail. Scanned image-only PDFs need OCR, which is not included. You can still edit or enter details manually.
+2. Upload a text-based PDF resume. The browser extracts a first pass for name, email, phone, links, location, education (degree and major), current role, skills, experience, projects, and achievements. Add your target role in the dashboard as a guided profile detail. Scanned image-only PDFs need OCR, which is not included. You can still edit or enter details manually.
 3. Review and edit all fields, then save. The PDF is uploaded to `resumes/<uid>/...`; profile JSON is saved under `users/<uid>/profile/current`.
 4. Open the demo form at `https://<project-id>.web.app/test-form.html` or from the Vite server. Click the extension icon to open the side panel, scan, edit suggestions, and fill. If a cover-letter field is detected, paste the job description to draft a letter on-device; cloud drafting requires its separate consent checkbox. Review and edit the draft before placing it in the form. Sensitive fields stay blank until you enter and confirm them. The extension never submits the form.
 5. After manually submitting a real application, use **I submitted this application** to save it. The dashboard lets you change status or delete the record.

@@ -15,6 +15,18 @@ const profile = {
   targetRole: 'Product Designer',
 };
 
+const detailedProfile = {
+  ...profile,
+  city: 'San Francisco',
+  state: 'CA',
+  postalCode: '94103',
+  country: 'United States',
+  degree: 'Bachelor of Science',
+  major: 'Computer Science',
+  currentCompany: 'Northstar Studio',
+  currentTitle: 'Product Designer',
+};
+
 describe('findProfileValue', () => {
   it('matches common contact and education labels to saved facts', () => {
     expect(findProfileValue('Full name', profile)).toBe('Jordan Lee');
@@ -36,6 +48,27 @@ describe('findProfileValue', () => {
     expect(findProfileValue('Phone*', profile)).toBe('+1 555 010 0100');
     expect(findProfileValue('Portfolio Website', profile)).toBe('https://jordanlee.dev');
     expect(findProfileValue('University or college', profile)).toBe('State University');
+  });
+
+  it('matches location, education, and current-role facts', () => {
+    expect(findProfileValue('City', detailedProfile)).toBe('San Francisco');
+    expect(findProfileValue('State', detailedProfile)).toBe('CA');
+    expect(findProfileValue('Zip code', detailedProfile)).toBe('94103');
+    expect(findProfileValue('Country', detailedProfile)).toBe('United States');
+    expect(findProfileValue('Degree', detailedProfile)).toBe('Bachelor of Science');
+    expect(findProfileValue('Major / Field of Study', detailedProfile)).toBe('Computer Science');
+    expect(findProfileValue('Current company', detailedProfile)).toBe('Northstar Studio');
+    expect(findProfileValue('Job title', detailedProfile)).toBe('Product Designer');
+  });
+
+  it('keeps the applicant name out of company and school name fields', () => {
+    expect(findProfileValue('Company name', detailedProfile)).toBe('Northstar Studio');
+    expect(findProfileValue('School name', profile)).toBe('State University');
+  });
+
+  it('does not answer location preferences with the saved city', () => {
+    expect(findProfileValue('Are you open to relocation?', detailedProfile)).toBeUndefined();
+    expect(findProfileValue('Preferred work location', detailedProfile)).toBeUndefined();
   });
 
   it('uses user-entered preferences and leaves unknown values blank', () => {

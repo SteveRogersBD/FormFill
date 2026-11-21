@@ -10,8 +10,71 @@ const sections: Record<string, keyof Pick<ResumeProfile, 'skills' | 'workExperie
   projects: 'projects', 'personal projects': 'projects', 'selected projects': 'projects', achievements: 'achievements', 'key achievements': 'achievements', awards: 'achievements', honors: 'achievements', 'awards and honors': 'achievements', 'honors and awards': 'achievements',
 };
 
+const US_STATES: Record<string, string> = {
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'District of Columbia',
+  FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine',
+  MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire',
+  NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island',
+  SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
+};
+const STATE_CODES = new Set(Object.keys(US_STATES));
+const STATE_NAMES = new Set(Object.values(US_STATES).map((name) => name.toLowerCase()));
+
+const COUNTRIES: Record<string, string> = {
+  'united states': 'United States', 'united states of america': 'United States', usa: 'United States', us: 'United States',
+  canada: 'Canada', 'united kingdom': 'United Kingdom', uk: 'United Kingdom', 'great britain': 'United Kingdom', ireland: 'Ireland',
+  germany: 'Germany', france: 'France', netherlands: 'Netherlands', spain: 'Spain', portugal: 'Portugal', italy: 'Italy', sweden: 'Sweden',
+  norway: 'Norway', denmark: 'Denmark', finland: 'Finland', poland: 'Poland', switzerland: 'Switzerland', austria: 'Austria', belgium: 'Belgium',
+  australia: 'Australia', 'new zealand': 'New Zealand', india: 'India', singapore: 'Singapore', japan: 'Japan', china: 'China', 'south korea': 'South Korea',
+  brazil: 'Brazil', mexico: 'Mexico', argentina: 'Argentina', 'south africa': 'South Africa', israel: 'Israel', 'united arab emirates': 'United Arab Emirates', uae: 'United Arab Emirates',
+};
+
+const DEGREE_PATTERN = /\b(bachelor|master|doctor|ph\.?d|associate|mba|b\.?s\.?c?|m\.?s\.?c?|b\.?a\.?|m\.?a\.?)\b/i;
+const roleVerb = /^(led|built|worked|created|managed|designed|developed|drove|owned|shipped|delivered|launched|partnered|collaborated)\b/i;
+
 function cleanLines(text: string) {
   return text.split(/\n+/).map((line) => line.replace(/^[-•*\s]+/, '').trim()).filter(Boolean);
+}
+
+function parseResumeLocation(lines: string[]) {
+  for (const line of lines.slice(0, 8)) {
+    const match = line.match(/^([A-Z][A-Za-z .'-]{1,40}),\s*([A-Za-z][A-Za-z .'-]{1,30}?)(?:\s+(\d{5}(?:-\d{4})?))?$/);
+    if (!match) continue;
+    const city = match[1].trim();
+    const region = match[2].trim();
+    const postalCode = match[3] ?? '';
+    const state = region.length === 2 && STATE_CODES.has(region.toUpperCase())
+      ? region.toUpperCase()
+      : STATE_NAMES.has(region.toLowerCase()) ? region : '';
+    const country = state ? '' : COUNTRIES[region.toLowerCase()] ?? '';
+    if (!state && !country && !postalCode) continue;
+    return { city, state, postalCode, country };
+  }
+  return { city: '', state: '', postalCode: '', country: '' };
+}
+
+function parseEducation(lines: string[]) {
+  const line = lines.find((candidate) => DEGREE_PATTERN.test(candidate) && !/\b(university|college|institute|polytechnic)\b/i.test(candidate));
+  if (!line) return { degree: '', major: '' };
+  const parts = line.split(/\s*[,–—]\s*/).map((part) => part.trim())
+    .filter((part) => part && !/^(?:(?:[A-Za-z]{3,9}\.?\s+)?\d{4})$/.test(part));
+  const degreeIndex = parts.findIndex((part) => DEGREE_PATTERN.test(part));
+  if (degreeIndex === -1) return { degree: '', major: '' };
+  return { degree: parts[degreeIndex], major: parts.filter((_, index) => index !== degreeIndex).join(', ') };
+}
+
+function parseCurrentRole(lines: string[]) {
+  const line = lines.find((candidate) => /\s+at\s+/i.test(candidate)
+    && candidate.length <= 160
+    && !candidate.endsWith('.')
+    && candidate.split(/\s+/).length <= 12
+    && !roleVerb.test(candidate));
+  if (!line) return { currentTitle: '', currentCompany: '' };
+  const [title, ...rest] = line.split(/\s+at\s+/i);
+  return {
+    currentTitle: title.trim(),
+    currentCompany: rest.join(' at ').replace(/\s*[·|]\s*.*$/, '').trim(),
+  };
 }
 
 export function extractProfileFromText(text: string): ResumeProfile {
@@ -56,6 +119,18 @@ export function extractProfileFromText(text: string): ResumeProfile {
   profile.university = educationLines.find((line) => /\b(university|college|institute|polytechnic)\b/i.test(line)) ?? profile.university;
   profile.graduationDate = educationLines.join('\n').match(/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[,\s]+20\d{2}\b|\b20\d{2}\b/g)?.at(-1) ?? '';
   profile.skills = [...new Set(profile.skills.flatMap((line) => line.split(/[,|•;]/).map((skill) => skill.trim()).filter(Boolean)))];
+
+  const location = parseResumeLocation(lines);
+  profile.city = location.city;
+  profile.state = location.state;
+  profile.postalCode = location.postalCode;
+  profile.country = location.country;
+  const education = parseEducation(educationLines);
+  profile.degree = education.degree;
+  profile.major = education.major;
+  const currentRole = parseCurrentRole(profile.workExperience);
+  profile.currentTitle = currentRole.currentTitle;
+  profile.currentCompany = currentRole.currentCompany;
   return profile;
 }
 

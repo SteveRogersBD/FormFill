@@ -48,6 +48,35 @@ describe('extractProfileFromText', () => {
     });
   });
 
+  it('extracts the location, degree, major, and current role', () => {
+    expect(extractProfileFromText(resumeText)).toMatchObject({
+      degree: 'Bachelor of Science',
+      major: 'Computer Science',
+      currentTitle: 'Product Designer',
+      currentCompany: 'Northstar Studio',
+    });
+
+    const located = extractProfileFromText(`
+      Alex Kim
+      alex@example.com
+      San Francisco, CA 94103
+      EDUCATION
+      City Institute
+      B.S. in Computer Science
+      WORK EXPERIENCE
+      Product Designer at Northstar Studio
+      Led research studies.
+    `);
+    expect(located).toMatchObject({
+      city: 'San Francisco',
+      state: 'CA',
+      postalCode: '94103',
+      degree: 'B.S. in Computer Science',
+      currentTitle: 'Product Designer',
+      currentCompany: 'Northstar Studio',
+    });
+  });
+
   it('extracts profile details from an actual PDF file', async () => {
     pdfjs.GlobalWorkerOptions.workerSrc = new URL('../../node_modules/pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;
     const bytes = await readFile(new URL('./fixtures/sample-resume.pdf', import.meta.url));

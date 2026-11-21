@@ -30,6 +30,61 @@ function labelFor(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectEl
   return [...new Set(text)].join(' · ');
 }
 
+const MONTH_NUMBERS: Record<string, string> = { jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12' };
+
+const US_STATES: Record<string, string> = {
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado', CT: 'Connecticut', DE: 'Delaware', DC: 'District of Columbia',
+  FL: 'Florida', GA: 'Georgia', HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas', KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine',
+  MD: 'Maryland', MA: 'Massachusetts', MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana', NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire',
+  NJ: 'New Jersey', NM: 'New Mexico', NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma', OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island',
+  SC: 'South Carolina', SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
+};
+const stateCodeByName: Record<string, string> = Object.fromEntries(Object.entries(US_STATES).map(([code, name]) => [name.toLowerCase(), code]));
+
+function normalizeOption(value: string) {
+  return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function monthValue(value: string) {
+  const clean = value.trim();
+  if (/^\d{4}-\d{2}$/.test(clean)) return clean;
+  const monthYear = clean.match(/^([A-Za-z]{3,9})\.?,?\s+(\d{4})$/);
+  if (monthYear) {
+    const month = MONTH_NUMBERS[monthYear[1].slice(0, 3).toLowerCase()];
+    if (month) return `${monthYear[2]}-${month}`;
+  }
+  const numeric = clean.match(/^(\d{1,2})\s*[/-]\s*(\d{4})$/);
+  if (numeric) {
+    const month = Number(numeric[1]);
+    if (month >= 1 && month <= 12) return `${numeric[2]}-${String(month).padStart(2, '0')}`;
+  }
+  return undefined;
+}
+
+function dateValue(value: string) {
+  const clean = value.trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) return clean;
+  const month = monthValue(clean);
+  return month ? `${month}-01` : undefined;
+}
+
+function optionEquivalents(value: string) {
+  const raw = value.trim();
+  const equivalents = new Set([normalizeOption(raw)]);
+  const stateName = US_STATES[raw.toUpperCase()];
+  if (stateName) equivalents.add(normalizeOption(stateName));
+  const stateCode = stateCodeByName[raw.toLowerCase()];
+  if (stateCode) equivalents.add(normalizeOption(stateCode));
+  if (/^(us|usa|u s|united states|united states of america)$/i.test(raw)) ['us', 'usa', 'unitedstates', 'unitedstatesofamerica'].forEach((item) => equivalents.add(item));
+  if (/^(uk|u k|united kingdom|great britain)$/i.test(raw)) ['uk', 'unitedkingdom', 'greatbritain'].forEach((item) => equivalents.add(item));
+  return equivalents;
+}
+
+function findOption(options: HTMLOptionElement[], value: string) {
+  const equivalents = optionEquivalents(value);
+  return options.find((option) => equivalents.has(normalizeOption(option.text)) || equivalents.has(normalizeOption(option.value)));
+}
+
 function scanFields(): DetectedField[] {
   const elements = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')]
     .filter((element) => {
@@ -112,14 +167,20 @@ function fillFields(values: Record<string, string>) {
       continue;
     }
     if (first instanceof HTMLSelectElement && first.multiple) continue;
-    if (first instanceof HTMLInputElement && ['file', 'password', 'number'].includes(first.type)) continue;
+    if (first instanceof HTMLInputElement && ['file', 'password'].includes(first.type)) continue;
+    if (first instanceof HTMLInputElement && first.type === 'number' && !/^-?\d+(?:\.\d+)?$/.test(value.trim())) continue;
     if (first instanceof HTMLSelectElement) {
-      const option = [...first.options].find((item) => item.text.trim().toLowerCase() === value.trim().toLowerCase() || item.value.toLowerCase() === value.trim().toLowerCase());
+      const option = findOption([...first.options].filter((item) => item.value), value);
       if (!option) continue;
       setValue(first, option.value);
     } else if (first instanceof HTMLInputElement && first.type === 'date') {
-      if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) continue;
-      setValue(first, value);
+      const date = dateValue(value);
+      if (!date) continue;
+      setValue(first, date);
+    } else if (first instanceof HTMLInputElement && first.type === 'month') {
+      const month = monthValue(value);
+      if (!month) continue;
+      setValue(first, month);
     } else if (first instanceof HTMLInputElement && first.type === 'url' && !/^https?:\/\//i.test(value)) {
       continue;
     } else {
