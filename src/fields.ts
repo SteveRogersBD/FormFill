@@ -43,8 +43,14 @@ const matches: [RegExp, MatchKey, RegExp?][] = [
   [/\bname\b/, 'fullName', notAnApplicantName],
 ];
 
+// Portal labels arrive with casing and punctuation noise; padding with spaces lets the
+// pattern tables rely on \b instead of guessing at word edges.
+export function normalizeLabel(label: string): string {
+  return ` ${label.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
+}
+
 export function findProfileValue(label: string, profile: ResumeProfile): string | undefined {
-  const normalized = ` ${label.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
+  const normalized = normalizeLabel(label);
   const match = matches.find(([pattern, , guard]) => pattern.test(normalized) && !guard?.test(normalized));
   if (!match) return undefined;
   const key = match[1];

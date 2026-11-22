@@ -1,3 +1,4 @@
+import { normalizeLabel } from './fields';
 import { preferenceAnswer, type PreferenceKey, type Preferences } from './preferences';
 
 export interface QuestionDef {
@@ -444,12 +445,8 @@ export const QUESTIONS: QuestionDef[] = [
   },
 ];
 
-export function normalizeQuestionLabel(label: string): string {
-  return ` ${label.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()} `;
-}
-
 export function matchQuestion(label: string): QuestionDef | undefined {
-  const normalized = normalizeQuestionLabel(label);
+  const normalized = normalizeLabel(label);
   return QUESTIONS.find((question) => question.patterns.some((pattern) => pattern.test(normalized))
     && !question.negative?.some((pattern) => pattern.test(normalized)));
 }
