@@ -1,0 +1,48 @@
+{
+  "guards": {
+    "notAQuestion": "\\b(hear about|why|describe|tell us|what interests|how would|additional information|cover letter)\\b",
+    "notALocationChoice": "\\b(relocat|open to|willing|preferred|remote|hybrid|onsite)\\b",
+    "notAnApplicantName": "\\b(company|employer|organi[sz]ation|school|university|college|reference|manager|user|file|account|first|last)\\b"
+  },
+  "profileMatches": [
+    { "pattern": "\\b(first|given|forename) name\\b", "key": "firstName" },
+    { "pattern": "\\b(last|family|sur) ?name\\b", "key": "lastName" },
+    { "pattern": "\\b(e mail|email)\\b", "key": "email" },
+    { "pattern": "\\b(phone|mobile|telephone|cell)\\b", "key": "phone" },
+    { "pattern": "\\blinkedin\\b", "key": "linkedin" },
+    { "pattern": "\\b(github|gitlab|portfolio|personal website|website|url)\\b", "key": "portfolio" },
+    { "pattern": "\\b(university|college|school|institution)\\b", "key": "university" },
+    { "pattern": "\\b(major|field of study|discipline|concentration)\\b", "key": "major" },
+    { "pattern": "\\b(degree|qualification)\\b", "key": "degree" },
+    { "pattern": "\\b(graduation|graduated|degree completion|completion date)\\b", "key": "graduationDate" },
+    { "pattern": "\\b(company|employer|organi[sz]ation)\\b", "key": "currentCompany", "guard": "notAQuestion" },
+    { "pattern": "\\b(job title|current title|position title|your title)\\b", "key": "currentTitle" },
+    { "pattern": "\\b(target role|desired role|role you are seeking|role are you seeking|position sought|desired position)\\b", "key": "targetRole" },
+    { "pattern": "\\b(skills|technologies|programming languages)\\b", "key": "skills" },
+    { "pattern": "\\b(work experience|employment|professional experience)\\b", "key": "workExperience" },
+    { "pattern": "\\bprojects?\\b", "key": "projects" },
+    { "pattern": "\\b(achievements|awards|honors)\\b", "key": "achievements" },
+    { "pattern": "\\b(city|town|location)\\b", "key": "city", "guard": "notALocationChoice" },
+    { "pattern": "\\b(state|province|region)\\b", "key": "state" },
+    { "pattern": "\\b(zip|postal code|postcode)\\b", "key": "postalCode" },
+    { "pattern": "\\bcountry\\b", "key": "country" },
+    { "pattern": "\\b(full|preferred|legal|your) name\\b", "key": "fullName" },
+    { "pattern": "\\bname\\b", "key": "fullName", "guard": "notAnApplicantName" }
+  ],
+  "sensitivePattern": "salary|compensation|sponsorship|visa|work authorization|authorized to work|citizenship|citizen|background check|security clearance|relocat|criminal|disability|medical|health|veteran|military|gender|pronoun|race|ethnicity|sexual orientation|consent|certify|attest|terms and conditions",
+  "coverLetterPattern": "\\bcover letter\\b|\\bletter of (?:interest|motivation)\\b|\\bstatement of interest\\b",
+  "preferenceAnswers": {
+    "yes": "Yes",
+    "no": "No",
+    "unsure": "Not sure",
+    "decline": "I don’t wish to answer",
+    "case_by_case": "Case by case",
+    "remote": "Remote",
+    "hybrid": "Hybrid",
+    "onsite": "On-site",
+    "flexible": "Flexible",
+    "year": "Per year",
+    "month": "Per month",
+    "hour": "Per hour"
+  }
+}
