@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { findProfileValue, isCoverLetterField, isSensitiveField } from './fields';
-import { listApplications, loadPreferences, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
+import { getResumeUrl, listApplications, loadPreferences, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
 import { emptyProfile, type ResumeProfile } from './profile';
 import { emptyPreferences, type Preferences } from './preferences';
 import { matchQuestion, questionAnswer } from './questions';
@@ -166,8 +166,20 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         frameValues[field.frameFieldId ?? field.id] = value;
         valuesByFrame.set(field.frameId ?? 0, frameValues);
       }
+      // A resume upload is a file, not a value, so it travels as a download URL the content
+      // script turns back into a File on the page.
+      const resumeField = scan.fields.find((field) => field.type === 'file' && /\b(resume|cv|curriculum)\b/i.test(field.label));
+      const resumeUrl = resumeField && profile.resumePath ? await getResumeUrl(profile.resumePath).catch(() => '') : '';
+      const resume = resumeField && resumeUrl
+        ? { fieldId: resumeField.frameFieldId ?? resumeField.id, url: resumeUrl, name: profile.resumePath.split('/').pop() ?? 'resume.pdf' }
+        : undefined;
+      if (resume && resumeField) valuesByFrame.set(resumeField.frameId ?? 0, valuesByFrame.get(resumeField.frameId ?? 0) ?? {});
       const results = await Promise.all([...valuesByFrame].map(async ([frameId, frameValues]) =>
-        await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_FILL_FIELDS', values: frameValues }, { frameId }) as { filled: number },
+        await chrome.tabs.sendMessage(tab.id, {
+          type: 'APPLYAI_FILL_FIELDS',
+          values: frameValues,
+          resume: resumeField && (resumeField.frameId ?? 0) === frameId ? resume : undefined,
+        }, { frameId }) as { filled: number },
       ));
       const filledCount = results.reduce((total, result) => total + result.filled, 0);
       setFilled(filledCount > 0);
@@ -243,13 +255,15 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       const sensitive = isSensitiveField(field.label);
       const unsupported = ['file', 'password', 'select-multiple'].includes(field.type);
       return <div className="answer-row" key={field.id}><label className="answer-label" htmlFor={`answer-${field.id}`}>{field.label || 'Unlabeled field'}{field.required && <i>Required</i>}</label>
-        {['radio', 'select'].includes(field.type) && field.options.length > 0 ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">Choose an option</option>{field.options.map((option) => <option key={option}>{option}</option>)}</select>
+        {['radio', 'select', 'choice'].includes(field.type) && field.options.length > 0 ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">Choose an option</option>{field.options.map((option) => <option key={option}>{option}</option>)}</select>
           : field.type === 'checkbox' ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">Leave unchanged</option><option value="true">Check this box</option></select>
           : field.type === 'textarea' ? <textarea id={`answer-${field.id}`} rows={4} value={values[field.id] ?? ''} disabled={unsupported} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />
           : <input id={`answer-${field.id}`} value={values[field.id] ?? ''} disabled={unsupported} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />}
         {sensitive && <label className="confirm-sensitive"><input type="checkbox" checked={Boolean(confirmed[field.id])} onChange={(event) => setConfirmed((current) => ({ ...current, [field.id]: event.target.checked }))} /> I reviewed this sensitive answer.</label>}
-        {unsupported && <span className="field-hint">This field type needs your attention on the page.</span>}
-        {!suggested && !values[field.id] && !unsupported && !sensitive && <span className="field-hint">No saved answer. Add it under <a href="dashboard.html#standing-answers" target="_blank">standing answers ↗</a>.</span>}
+        {unsupported && <span className="field-hint">{field.type === 'file'
+          ? profile.resumePath ? 'Your saved resume is attached when you fill.' : 'Upload a resume in your profile to attach it automatically.'
+          : 'This field type needs your attention on the page.'}</span>}
+        {!suggested && !values[field.id] && !unsupported && <span className="field-hint">No saved answer yet. Add it under <a href="dashboard.html#standing-answers" target="_blank">standing answers ↗</a>.</span>}
       </div>;
     })}</div><button className="button secondary wide ai-button" onClick={() => suggestWithAI(false)} disabled={busy}>✦ Suggest with on-device AI</button><label className="cloud-consent"><input type="checkbox" checked={cloudConsent} onChange={(event) => setCloudConsent(event.target.checked)} /> I approve sending this form’s field labels and relevant profile details to Firebase AI Logic for cloud suggestions.</label>{!firebaseAppCheckReady && <p className="field-hint">Cloud AI needs a Firebase App Check site key in your local configuration.</p>}<button className="text-button cloud-button" onClick={() => suggestWithAI(true)} disabled={busy || !cloudConsent || !firebaseAppCheckReady}>Use cloud AI with my approval ↗</button><button className="button primary wide fill-button" onClick={fillPage} disabled={busy}>{busy ? 'Working…' : 'Fill reviewed answers'}</button><p className="fine-print center">ApplyAI never submits the application for you.</p></section>}
     {coverLetterField && <section className="panel-section cover-letter-section">
