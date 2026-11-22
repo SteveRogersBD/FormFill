@@ -14,7 +14,6 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(env_prefix="APPLYAI_", env_file=SERVER_ROOT / ".env", extra="ignore")
 
-    environment: str = "development"
     version: str = "0.1.0"
     require_app_check: bool = False
     # Explicit origins win; when the list is empty, development allows the extension and
