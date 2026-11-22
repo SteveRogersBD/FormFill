@@ -12,7 +12,6 @@ from .config import SHARED_DIR
 _data = json.loads((SHARED_DIR / "field-rules.json").read_text(encoding="utf-8"))
 
 SENSITIVE = re.compile(_data["sensitivePattern"], re.IGNORECASE)
-COVER_LETTER = re.compile(_data["coverLetterPattern"], re.IGNORECASE)
 
 _guards = {name: re.compile(source) for name, source in _data["guards"].items()}
 # Order is match priority, exactly as the extension evaluates it.
@@ -26,10 +25,6 @@ _preference_text: dict[str, str] = _data["preferenceAnswers"]
 
 def is_sensitive(label: str) -> bool:
     return SENSITIVE.search(label) is not None
-
-
-def is_cover_letter(label: str) -> bool:
-    return COVER_LETTER.search(label) is not None
 
 
 def preference_text(value: str) -> str:
