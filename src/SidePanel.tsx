@@ -88,7 +88,9 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const refreshProfile = useCallback(async () => {
     setLoading(true);
     try {
-      const [savedProfile, records, savedPreferences] = await Promise.all([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid)]);
+      // Standing answers are an enhancement: a missing rules deploy or a brand-new account
+      // must not block the profile load, which scanning depends on.
+      const [savedProfile, records, savedPreferences] = await Promise.all([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid).catch(() => null)]);
       setProfile(savedProfile ?? emptyProfile()); setApplications(records); setPreferences(savedPreferences ?? emptyPreferences());
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not load your profile.'); }
     finally { setLoading(false); }
