@@ -1,5 +1,6 @@
 import { getFirebaseServices } from './firebase';
 import { resumeProfileSchema, type ResumeProfile } from './profile';
+import { preferencesSchema, type Preferences } from './preferences';
 import { z } from 'zod';
 
 const applicationSchema = z.object({
@@ -58,6 +59,21 @@ export async function getResumeUrl(path: string) {
   const { storage } = await getFirebaseServices();
   const { getDownloadURL, ref } = await import('firebase/storage');
   return getDownloadURL(ref(storage, path));
+}
+
+export async function loadPreferences(uid: string): Promise<Preferences | null> {
+  const { db } = await getFirebaseServices();
+  const { doc, getDoc } = await import('firebase/firestore');
+  const snapshot = await getDoc(doc(db, 'users', uid, 'preferences', 'current'));
+  return snapshot.exists() ? preferencesSchema.parse(snapshot.data()) : null;
+}
+
+export async function savePreferences(preferences: Preferences, uid: string) {
+  const { db } = await getFirebaseServices();
+  const { doc, setDoc } = await import('firebase/firestore');
+  const savedPreferences = preferencesSchema.parse({ ...preferences, updatedAt: Date.now() });
+  await setDoc(doc(db, 'users', uid, 'preferences', 'current'), savedPreferences);
+  return savedPreferences;
 }
 
 export async function listApplications(uid: string): Promise<ApplicationRecord[]> {
