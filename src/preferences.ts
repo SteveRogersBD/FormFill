@@ -57,7 +57,7 @@ export type AnswerKey = Exclude<PreferenceKey, 'eeoOptIn'>;
 
 type Choice = { value: string; label: string };
 
-export const YES_NO: Choice[] = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
+const YES_NO: Choice[] = [{ value: 'yes', label: 'Yes' }, { value: 'no', label: 'No' }];
 export const YES_NO_UNSURE: Choice[] = [...YES_NO, { value: 'unsure', label: 'Not sure' }];
 const YES_NO_DECLINE: Choice[] = [...YES_NO, { value: 'decline', label: 'Prefer not to say' }];
 
