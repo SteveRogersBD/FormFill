@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { findProfileValue, isCoverLetterField, isSensitiveField } from './fields';
-import { listApplications, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
+import { listApplications, loadPreferences, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
 import { emptyProfile, type ResumeProfile } from './profile';
+import { emptyPreferences, type Preferences } from './preferences';
+import { matchQuestion, questionAnswer } from './questions';
 import { firebaseAppCheckReady } from './firebase';
 import { hostPermissionPattern, type ApplicationScan } from './applicationPage';
 
@@ -63,6 +65,7 @@ async function scanActivePage(tabId: number): Promise<ScanAttempt> {
 
 export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Promise<void> }) {
   const [profile, setProfile] = useState<ResumeProfile>(emptyProfile());
+  const [preferences, setPreferences] = useState<Preferences>(emptyPreferences());
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
   const [scan, setScan] = useState<ApplicationScan | null>(null);
   const [values, setValues] = useState<Record<string, string>>({});
@@ -85,8 +88,8 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const refreshProfile = useCallback(async () => {
     setLoading(true);
     try {
-      const [savedProfile, records] = await Promise.all([loadProfile(user.uid), listApplications(user.uid)]);
-      setProfile(savedProfile ?? emptyProfile()); setApplications(records);
+      const [savedProfile, records, savedPreferences] = await Promise.all([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid)]);
+      setProfile(savedProfile ?? emptyProfile()); setApplications(records); setPreferences(savedPreferences ?? emptyPreferences());
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not load your profile.'); }
     finally { setLoading(false); }
   }, [user.uid]);
@@ -95,7 +98,13 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     void refreshProfile();
   }, [refreshProfile]);
 
-  const suggestions = useMemo(() => scan?.fields.map((field) => ({ field, suggested: findProfileValue(field.label, profile) ?? '' })) ?? [], [scan, profile]);
+  const answerFor = useCallback((label: string) => {
+    const question = matchQuestion(label);
+    // A taxonomy hit is authoritative: an open-ended question must not be answered with a
+    // profile list just because no standing answer exists yet.
+    return question ? questionAnswer(question, preferences) : findProfileValue(label, profile) ?? '';
+  }, [preferences, profile]);
+  const suggestions = useMemo(() => scan?.fields.map((field) => ({ field, suggested: answerFor(field.label) })) ?? [], [scan, answerFor]);
   const coverLetterField = scan?.fields.find((field) => isCoverLetterField(field.label) && ['text', 'textarea'].includes(field.type));
   const scanPage = async () => {
     setBusy(true); setError(''); setNotice(''); setFilled(false);
@@ -118,7 +127,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       const result = attempt.scan; setScan(result);
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
-      setValues(Object.fromEntries(result.fields.map((field) => [field.id, findProfileValue(field.label, profile) ?? ''])));
+      setValues(Object.fromEntries(result.fields.map((field) => [field.id, answerFor(field.label)])));
       const pageType = result.platform === 'greenhouse' ? ' on this Greenhouse application' : '';
       setNotice(result.fields.length ? `Found ${result.fields.length} fields${pageType}. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not inspect this page.'); }
@@ -238,7 +247,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
           : <input id={`answer-${field.id}`} value={values[field.id] ?? ''} disabled={unsupported} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />}
         {sensitive && <label className="confirm-sensitive"><input type="checkbox" checked={Boolean(confirmed[field.id])} onChange={(event) => setConfirmed((current) => ({ ...current, [field.id]: event.target.checked }))} /> I reviewed this sensitive answer.</label>}
         {unsupported && <span className="field-hint">This field type needs your attention on the page.</span>}
-        {!suggested && !values[field.id] && !unsupported && !sensitive && <span className="field-hint">No matching profile detail. It will stay empty.</span>}
+        {!suggested && !values[field.id] && !unsupported && !sensitive && <span className="field-hint">No saved answer. Add it under <a href="dashboard.html#standing-answers" target="_blank">standing answers ↗</a>.</span>}
       </div>;
     })}</div><button className="button secondary wide ai-button" onClick={() => suggestWithAI(false)} disabled={busy}>✦ Suggest with on-device AI</button><label className="cloud-consent"><input type="checkbox" checked={cloudConsent} onChange={(event) => setCloudConsent(event.target.checked)} /> I approve sending this form’s field labels and relevant profile details to Firebase AI Logic for cloud suggestions.</label>{!firebaseAppCheckReady && <p className="field-hint">Cloud AI needs a Firebase App Check site key in your local configuration.</p>}<button className="text-button cloud-button" onClick={() => suggestWithAI(true)} disabled={busy || !cloudConsent || !firebaseAppCheckReady}>Use cloud AI with my approval ↗</button><button className="button primary wide fill-button" onClick={fillPage} disabled={busy}>{busy ? 'Working…' : 'Fill reviewed answers'}</button><p className="fine-print center">ApplyAI never submits the application for you.</p></section>}
     {coverLetterField && <section className="panel-section cover-letter-section">
