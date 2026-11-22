@@ -1,4 +1,5 @@
 import type { ProfileField, ResumeProfile } from './profile';
+import rules from '../shared/field-rules.json';
 
 export interface DetectedField {
   id: string;
@@ -13,35 +14,27 @@ export interface DetectedField {
 
 type MatchKey = ProfileField | 'firstName' | 'lastName';
 
-const notAQuestion = /\b(hear about|why|describe|tell us|what interests|how would|additional information|cover letter)\b/;
-const notALocationChoice = /\b(relocat|open to|willing|preferred|remote|hybrid|onsite)\b/;
-const notAnApplicantName = /\b(company|employer|organi[sz]ation|school|university|college|reference|manager|user|file|account|first|last)\b/;
+interface ProfileRule {
+  pattern: string;
+  key: string;
+  guard?: string;
+}
 
-const matches: [RegExp, MatchKey, RegExp?][] = [
-  [/\b(first|given|forename) name\b/, 'firstName'],
-  [/\b(last|family|sur) ?name\b/, 'lastName'],
-  [/\b(e mail|email)\b/, 'email'],
-  [/\b(phone|mobile|telephone|cell)\b/, 'phone'],
-  [/\blinkedin\b/, 'linkedin'],
-  [/\b(github|gitlab|portfolio|personal website|website|url)\b/, 'portfolio'],
-  [/\b(university|college|school|institution)\b/, 'university'],
-  [/\b(major|field of study|discipline|concentration)\b/, 'major'],
-  [/\b(degree|qualification)\b/, 'degree'],
-  [/\b(graduation|graduated|degree completion|completion date)\b/, 'graduationDate'],
-  [/\b(company|employer|organi[sz]ation)\b/, 'currentCompany', notAQuestion],
-  [/\b(job title|current title|position title|your title)\b/, 'currentTitle'],
-  [/\b(target role|desired role|role you are seeking|role are you seeking|position sought|desired position)\b/, 'targetRole'],
-  [/\b(skills|technologies|programming languages)\b/, 'skills'],
-  [/\b(work experience|employment|professional experience)\b/, 'workExperience'],
-  [/\bprojects?\b/, 'projects'],
-  [/\b(achievements|awards|honors)\b/, 'achievements'],
-  [/\b(city|town|location)\b/, 'city', notALocationChoice],
-  [/\b(state|province|region)\b/, 'state'],
-  [/\b(zip|postal code|postcode)\b/, 'postalCode'],
-  [/\bcountry\b/, 'country'],
-  [/\b(full|preferred|legal|your) name\b/, 'fullName'],
-  [/\bname\b/, 'fullName', notAnApplicantName],
-];
+// Label rules live in shared/field-rules.json so the Python service resolves profile facts
+// from the same table instead of a drifting copy. Order is match priority, and a guard
+// stops a broad row from swallowing a narrower one the way a plain table would.
+const guards: Record<string, RegExp> = Object.fromEntries(
+  Object.entries(rules.guards).map(([name, source]) => [name, new RegExp(source)]),
+);
+
+const matches: [RegExp, MatchKey, RegExp?][] = (rules.profileMatches as ProfileRule[]).map((rule) => [
+  new RegExp(rule.pattern),
+  rule.key as MatchKey,
+  rule.guard ? guards[rule.guard] : undefined,
+]);
+
+const sensitivePattern = new RegExp(rules.sensitivePattern, 'i');
+const coverLetterPattern = new RegExp(rules.coverLetterPattern, 'i');
 
 // Portal labels arrive with casing and punctuation noise; padding with spaces lets the
 // pattern tables rely on \b instead of guessing at word edges.
@@ -65,9 +58,9 @@ export function findProfileValue(label: string, profile: ResumeProfile): string 
 }
 
 export function isSensitiveField(label: string): boolean {
-  return /salary|compensation|sponsorship|visa|work authorization|authorized to work|citizenship|citizen|background check|security clearance|relocat|criminal|disability|medical|health|veteran|military|gender|pronoun|race|ethnicity|sexual orientation|consent|certify|attest|terms and conditions/i.test(label);
+  return sensitivePattern.test(label);
 }
 
 export function isCoverLetterField(label: string): boolean {
-  return /\bcover letter\b|\bletter of (?:interest|motivation)\b|\bstatement of interest\b/i.test(label);
+  return coverLetterPattern.test(label);
 }

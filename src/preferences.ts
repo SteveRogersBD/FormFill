@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import rules from '../shared/field-rules.json';
 
 const yesNo = z.enum(['', 'yes', 'no']).default('');
 const yesNoUnsure = z.enum(['', 'yes', 'no', 'unsure']).default('');
@@ -186,24 +187,12 @@ export function emptyPreferences(): Preferences {
 export const PREFERENCE_FIELDS: PreferenceField[] = PREFERENCE_GROUPS.flatMap((group) => group.fields);
 
 // Canonical values are stored short ('yes', 'decline') so one answer can be translated
-// into whatever wording each portal's options use.
-const ANSWER_TEXT: Record<string, string> = {
-  yes: 'Yes',
-  no: 'No',
-  unsure: 'Not sure',
-  decline: 'I don’t wish to answer',
-  case_by_case: 'Case by case',
-  remote: 'Remote',
-  hybrid: 'Hybrid',
-  onsite: 'On-site',
-  flexible: 'Flexible',
-  year: 'Per year',
-  month: 'Per month',
-  hour: 'Per hour',
-};
+// into whatever wording each portal's options use. The wording table is shared with the
+// Python service, which stamps the same text into the answers it resolves.
+const answerText = rules.preferenceAnswers as Record<string, string>;
 
 export function preferenceAnswer(value: string): string {
   const clean = value.trim();
   if (!clean) return '';
-  return ANSWER_TEXT[clean] ?? clean;
+  return answerText[clean] ?? clean;
 }
