@@ -1,11 +1,13 @@
 import { useEffect, useState, type ChangeEvent } from 'react';
 import type { User } from 'firebase/auth';
-import { deleteApplication, getResumeUrl, listApplications, loadProfile, saveProfile, saveResume, updateApplication, type ApplicationRecord } from './data';
+import { deleteApplication, getResumeUrl, listApplications, loadPreferences, loadProfile, savePreferences, saveProfile, saveResume, updateApplication, type ApplicationRecord } from './data';
 import { emptyProfile, PROFILE_FIELDS, type ProfileField, type ResumeProfile } from './profile';
+import { emptyPreferences, PREFERENCE_FIELDS, PREFERENCE_GROUPS, type AnswerKey, type Preferences } from './preferences';
 
 export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Promise<void> }) {
   const [profile, setProfile] = useState<ResumeProfile>(emptyProfile());
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
+  const [preferences, setPreferences] = useState<Preferences>(emptyPreferences());
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
@@ -13,9 +15,10 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([loadProfile(user.uid), listApplications(user.uid)]).then(([savedProfile, records]) => {
+    Promise.all([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid)]).then(([savedProfile, records, savedPreferences]) => {
       setProfile(savedProfile ?? emptyProfile());
       setApplications(records);
+      setPreferences(savedPreferences ?? emptyPreferences());
     }).catch((reason) => setError(reason instanceof Error ? reason.message : 'Could not load your profile.')).finally(() => setLoading(false));
   }, [user.uid]);
 
@@ -42,6 +45,25 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
     const value = field?.list ? rawValue.split(field.key === 'skills' ? /\n|,/ : /\n/).map((item) => item.trim()).filter(Boolean) : rawValue;
     setProfile((current) => ({ ...current, [key]: value }));
   };
+
+  const updatePreference = <K extends AnswerKey>(key: K, value: Preferences[K]) => {
+    setPreferences((current) => ({ ...current, [key]: value }));
+  };
+
+  const saveStandingAnswers = async () => {
+    setWorking(true); setError(''); setMessage('');
+    try {
+      const saved = await savePreferences(preferences, user.uid);
+      setPreferences(saved); setMessage('Standing answers saved. Scanned forms will use them from now on.');
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save your standing answers. Check your Firebase configuration and rules.'); }
+    finally { setWorking(false); }
+  };
+
+  // Deep links from the side panel (#sa-visaStatus) open the exact question to fill in.
+  useEffect(() => {
+    const target = window.location.hash.slice(1);
+    if (!loading && target) document.getElementById(target)?.scrollIntoView({ block: 'center' });
+  }, [loading]);
 
   const save = async () => {
     setWorking(true); setError(''); setMessage('');
@@ -95,6 +117,24 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
           <div className="save-row"><span className="muted tiny-text">You can edit any detail before saving.</span><button className="button primary" onClick={save} disabled={working || loading}>{working ? 'Saving…' : 'Save profile'}</button></div>
         </section>
       </div>
+      <section className="card standing-card" id="standing-answers">
+        <div className="section-heading"><div><p className="eyebrow">03 · ASKED EVERY TIME</p><h2>Standing answers</h2></div><span className="field-count">{PREFERENCE_FIELDS.filter(({ key }) => String(preferences[key]).trim()).length}/{PREFERENCE_FIELDS.length} answered</span></div>
+        <p className="muted small-text">Questions every portal asks that a resume cannot answer. Answer once here and scans reuse them, however the form words them.</p>
+        <div className="standing-groups">{PREFERENCE_GROUPS.map((group) => <details className="standing-group" key={group.id} open={group.id !== 'voluntary'}>
+          <summary><span className="eyebrow">{group.eyebrow}</span><strong>{group.title}</strong><span className="field-count">{group.fields.filter(({ key }) => String(preferences[key]).trim()).length}/{group.fields.length}</span></summary>
+          <div className="field-grid">{group.fields.map((field) => <label className={`form-field ${field.multiline ? 'span-two' : ''}`} key={field.key} id={`sa-${field.key}`}>
+            <span>{field.label}</span>
+            {field.choices
+              ? <select value={preferences[field.key]} onChange={(event) => updatePreference(field.key, event.target.value)}><option value="">Not set</option>{field.choices.map((choice) => <option key={choice.value} value={choice.value}>{choice.label}</option>)}</select>
+              : field.multiline
+                ? <textarea rows={3} value={preferences[field.key]} onChange={(event) => updatePreference(field.key, event.target.value)} placeholder={field.hint ?? ''} />
+                : <input value={preferences[field.key]} onChange={(event) => updatePreference(field.key, event.target.value)} placeholder={field.hint ?? ''} />}
+            {field.hint && !field.multiline && <small className="field-note">{field.hint}</small>}
+          </label>)}</div>
+          {group.id === 'voluntary' && <label className="cloud-consent"><input type="checkbox" checked={preferences.eeoOptIn} onChange={(event) => setPreferences((current) => ({ ...current, eeoOptIn: event.target.checked }))} /> Use these answers when a form asks. They never reach a model, and nothing is filled until you tick this.</label>}
+        </details>)}</div>
+        <div className="save-row"><span className="muted tiny-text">Empty means “not set”, so ApplyAI asks instead of guessing.</span><button className="button primary" onClick={saveStandingAnswers} disabled={working || loading}>{working ? 'Saving…' : 'Save standing answers'}</button></div>
+      </section>
       <section className="card applications-card"><div className="section-heading"><div><p className="eyebrow">YOUR SEARCH</p><h2>Applications</h2></div><span className="field-count">{applications.length} saved</span></div>
         {loading ? <div className="skeleton">Loading applications…</div> : applications.length === 0 ? <p className="empty-state">When you confirm that you’ve applied, your application will show up here.</p> : <div className="application-list">{applications.map((application) => <article className="application-row" key={application.id}><div><strong>{application.role || 'Role not specified'}</strong><span>{application.company || application.url}</span><a href={application.url} target="_blank" rel="noreferrer">Open application ↗</a></div><select aria-label={`Update status for ${application.role || application.company}`} value={application.status} onChange={(event) => changeStatus(application, event.target.value as ApplicationRecord['status'])}><option value="submitted">Submitted</option><option value="in_progress">In progress</option><option value="interview">Interview</option><option value="rejected">Rejected</option><option value="offer">Offer</option></select><time>{application.createdAt ? new Date(application.createdAt).toLocaleDateString() : ''}</time><button className="text-button delete-button" onClick={() => removeApplication(application)}>Delete</button></article>)}</div>}
       </section>
