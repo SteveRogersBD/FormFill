@@ -80,7 +80,7 @@ describe('findProfileValue', () => {
 });
 
 describe('isSensitiveField', () => {
-  it.each(['Work authorization', 'Visa sponsorship', 'Salary expectation', 'Gender', 'Citizenship', 'Background check', 'Open to relocation', 'Consent to a background check'])('%s requires confirmation', (label) => {
+  it.each(['Work authorization', 'Visa sponsorship', 'Salary expectation', 'Gender', 'Pronouns', 'Preferred pronouns', 'Citizenship', 'Background check', 'Open to relocation', 'Consent to a background check'])('%s requires confirmation', (label) => {
     expect(isSensitiveField(label)).toBe(true);
   });
 

@@ -59,7 +59,7 @@ export function findProfileValue(label: string, profile: ResumeProfile): string 
 }
 
 export function isSensitiveField(label: string): boolean {
-  return /salary|compensation|sponsorship|visa|work authorization|authorized to work|citizenship|citizen|background check|security clearance|relocat|criminal|disability|medical|health|veteran|military|gender|race|ethnicity|sexual orientation|consent|certify|attest|terms and conditions/i.test(label);
+  return /salary|compensation|sponsorship|visa|work authorization|authorized to work|citizenship|citizen|background check|security clearance|relocat|criminal|disability|medical|health|veteran|military|gender|pronoun|race|ethnicity|sexual orientation|consent|certify|attest|terms and conditions/i.test(label);
 }
 
 export function isCoverLetterField(label: string): boolean {
