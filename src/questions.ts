@@ -392,7 +392,7 @@ export const QUESTIONS: QuestionDef[] = [
     fieldType: 'narrative',
     answerFrom: 'llm',
     sensitivity: 'standard',
-    patterns: [/\b(favorite|best|proudest|most (challenging|interesting|complex)) project\b/, /\btell us about a project\b/, /\bdescribe a project\b/],
+    patterns: [/\b(favorite|best|proudest|most (challenging|interesting|complex)) project\b/, /\btell us about a project\b/, /\bdescribe a project\b/, /\bproud\b/],
   },
   {
     id: 'conflict',
