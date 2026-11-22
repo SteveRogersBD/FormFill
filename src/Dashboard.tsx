@@ -15,7 +15,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
   const [error, setError] = useState('');
 
   useEffect(() => {
-    Promise.all([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid)]).then(([savedProfile, records, savedPreferences]) => {
+    Promise.all([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid).catch(() => null)]).then(([savedProfile, records, savedPreferences]) => {
       setProfile(savedProfile ?? emptyProfile());
       setApplications(records);
       setPreferences(savedPreferences ?? emptyPreferences());
