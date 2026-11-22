@@ -17,17 +17,37 @@ function inferContentPageContext(hostname: string, title: string, heading = '') 
   };
 }
 
+function cleanLabelText(value: string | null | undefined) {
+  return (value ?? '').replace(/\s+/g, ' ').trim();
+}
+
+// A bare "Yes" is the option, not the question, so it must never become the field label.
+const bareOption = /^(yes|no|true|false|male|female|other|none|decline( to (self )?identify)?|i don'?t wish to answer|prefer not to say)$/i;
+
+function groupLabel(element: HTMLElement) {
+  const group = element.closest('fieldset, [role="radiogroup"], [role="group"]');
+  if (!group) return '';
+  const labelledBy = group.getAttribute('aria-labelledby')?.split(/\s+/)
+    .map((id) => document.getElementById(id)?.textContent).join(' ') ?? '';
+  return cleanLabelText(group.querySelector('legend')?.textContent)
+    || cleanLabelText(group.getAttribute('aria-label'))
+    || cleanLabelText(labelledBy);
+}
+
+// Portals repeat a question in several places and end with an internal id. The applicant
+// reads the first piece of human text, so that is what the panel shows and matching uses.
 function labelFor(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement) {
-  const text = [
+  const options = [
+    element instanceof HTMLInputElement && element.type === 'radio' ? groupLabel(element) : '',
     ...(element.labels ? [...element.labels].map((label) => label.innerText) : []),
-    element.getAttribute('aria-label') ?? '',
+    groupLabel(element),
     ...(element.getAttribute('aria-labelledby')?.split(/\s+/).map((id) => document.getElementById(id)?.textContent ?? '') ?? []),
+    element.getAttribute('aria-label') ?? '',
     element.getAttribute('placeholder') ?? '',
-    element.name,
-    element.id,
-    element.closest('fieldset')?.querySelector('legend')?.textContent ?? '',
-  ].map((value) => value.trim()).filter(Boolean);
-  return [...new Set(text)].join(' · ');
+    (element.name ?? '').replace(/^_+/, '').replace(/_/g, ' '),
+    element.id.replace(/^_+/, '').replace(/_/g, ' '),
+  ].map(cleanLabelText).filter(Boolean);
+  return options.find((text) => !bareOption.test(text)) ?? options[0] ?? '';
 }
 
 const MONTH_NUMBERS: Record<string, string> = { jan: '01', feb: '02', mar: '03', apr: '04', may: '05', jun: '06', jul: '07', aug: '08', sep: '09', oct: '10', nov: '11', dec: '12' };
@@ -120,6 +140,39 @@ function scanFields(): DetectedField[] {
       selector: `[data-applyai-field="${id}"]`,
     });
   }
+  return [...fields, ...scanChoiceGroups(fields.length)];
+}
+
+// Some portals render yes/no questions as buttons instead of inputs, so they never reach the
+// element scan above. Only groups inside a form with short option text qualify, which keeps
+// navigation, pagination and submit controls out.
+function scanChoiceGroups(startIndex: number): DetectedField[] {
+  const groups = [...document.querySelectorAll<HTMLElement>('form [role="radiogroup"], form fieldset:not(:has([role="radiogroup"]))')];
+  const fields: DetectedField[] = [];
+  for (const group of groups) {
+    if (group.querySelector('input, textarea, select')) continue;
+    const buttons = [...group.querySelectorAll<HTMLElement>('button, [role="radio"]')]
+      .filter((button) => {
+        const text = cleanLabelText(button.textContent);
+        return text.length > 0 && text.length <= 30;
+      });
+    if (buttons.length < 2 || buttons.length > 6) continue;
+    const label = cleanLabelText(group.getAttribute('aria-label'))
+      || cleanLabelText(group.querySelector('legend')?.textContent)
+      || cleanLabelText(group.previousElementSibling?.textContent)
+      || cleanLabelText(group.parentElement?.querySelector('label, legend, h3, p')?.textContent);
+    if (!label) continue;
+    const id = `applyai-${startIndex + fields.length}`;
+    buttons.forEach((button) => button.setAttribute('data-applyai-field', id));
+    fields.push({
+      id,
+      label,
+      type: 'choice',
+      required: group.getAttribute('aria-required') === 'true',
+      options: buttons.map((button) => cleanLabelText(button.textContent)),
+      selector: `[data-applyai-field="${id}"]`,
+    });
+  }
   return fields;
 }
 
@@ -143,12 +196,47 @@ function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectEl
   element.dispatchEvent(new Event('change', { bubbles: true }));
 }
 
-function fillFields(values: Record<string, string>) {
+// Custom dropdowns keep their truth in a listbox, not in the input's value: typing a location
+// leaves the field unset until an option is actually chosen.
+async function pickListOption(element: HTMLElement, value: string) {
+  const isCombobox = /\bcombobox\b/i.test(element.getAttribute('role') ?? '') || element.hasAttribute('aria-autocomplete');
+  if (!isCombobox) return false;
+  const wanted = optionEquivalents(value);
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const option = [...document.querySelectorAll<HTMLElement>('[role="option"]')]
+      .find((item) => wanted.has(normalizeOption(item.textContent ?? '')));
+    if (option) { option.click(); return true; }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  return false;
+}
+
+async function attachResume(element: HTMLInputElement, url: string, name: string) {
+  const response = await fetch(url);
+  if (!response.ok) return false;
+  const blob = await response.blob();
+  const transfer = new DataTransfer();
+  transfer.items.add(new File([blob], name, { type: blob.type || 'application/pdf' }));
+  Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'files')?.set?.call(element, transfer.files);
+  element.dispatchEvent(new Event('input', { bubbles: true }));
+  element.dispatchEvent(new Event('change', { bubbles: true }));
+  return true;
+}
+
+async function fillFields(values: Record<string, string>, resume?: { fieldId: string; url: string; name: string }) {
   let filled = 0;
   for (const [id, value] of Object.entries(values)) {
-    const elements = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>(`[data-applyai-field="${CSS.escape(id)}"]`)];
+    const elements = [...document.querySelectorAll<HTMLElement>(`[data-applyai-field="${CSS.escape(id)}"]`)];
     const first = elements[0];
     if (!first || !value) continue;
+    if (first.matches('button, [role="radio"]')) {
+      const wanted = optionEquivalents(value);
+      const choice = elements.find((element) => wanted.has(normalizeOption(element.textContent ?? '')));
+      if (!choice) continue;
+      choice.click();
+      filled += 1;
+      continue;
+    }
     if (first instanceof HTMLInputElement && first.type === 'radio') {
       const selected = elements.find((element) => element instanceof HTMLInputElement && element.type === 'radio' && (element.value.trim().toLowerCase() === value.trim().toLowerCase() || element.labels?.[0]?.innerText.trim().toLowerCase() === value.trim().toLowerCase()));
       if (!(selected instanceof HTMLInputElement)) continue;
@@ -183,10 +271,17 @@ function fillFields(values: Record<string, string>) {
       setValue(first, month);
     } else if (first instanceof HTMLInputElement && first.type === 'url' && !/^https?:\/\//i.test(value)) {
       continue;
-    } else {
+    } else if (first instanceof HTMLInputElement || first instanceof HTMLTextAreaElement || first instanceof HTMLSelectElement) {
       setValue(first, value);
+      await pickListOption(first, value);
+    } else {
+      continue;
     }
     filled += 1;
+  }
+  if (resume) {
+    const field = document.querySelector<HTMLInputElement>(`[data-applyai-field="${CSS.escape(resume.fieldId)}"]`);
+    if (field?.type === 'file' && await attachResume(field, resume.url, resume.name)) filled += 1;
   }
   return filled;
 }
@@ -206,7 +301,7 @@ if (!contentWorld.__applyAiPageListenerInstalled) {
       } satisfies ApplicationScan);
     }
     if (message?.type === 'APPLYAI_FILL_FIELDS') {
-      sendResponse({ filled: fillFields(message.values ?? {}) });
+      fillFields(message.values ?? {}, message.resume).then((filled) => sendResponse({ filled })).catch(() => sendResponse({ filled: 0 }));
     }
     return true;
   });
