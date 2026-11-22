@@ -52,6 +52,8 @@ export const preferencesSchema = z.object({
 
 export type Preferences = z.infer<typeof preferencesSchema>;
 export type PreferenceKey = Exclude<keyof Preferences, 'updatedAt'>;
+// Everything the dashboard edits as text. The EEO opt-in is a checkbox handled on its own.
+export type AnswerKey = Exclude<PreferenceKey, 'eeoOptIn'>;
 
 type Choice = { value: string; label: string };
 
@@ -60,7 +62,7 @@ export const YES_NO_UNSURE: Choice[] = [...YES_NO, { value: 'unsure', label: 'No
 const YES_NO_DECLINE: Choice[] = [...YES_NO, { value: 'decline', label: 'Prefer not to say' }];
 
 export interface PreferenceField {
-  key: PreferenceKey;
+  key: AnswerKey;
   label: string;
   hint?: string;
   choices?: Choice[];
