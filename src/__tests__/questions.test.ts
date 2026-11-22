@@ -55,6 +55,7 @@ describe('matchQuestion', () => {
   it('marks open-ended questions as drafts instead of filling them from the profile', () => {
     expect(matchQuestion('Why do you want to join Acme?')?.answerFrom).toBe('llm');
     expect(matchQuestion('Tell us about your best project')?.id).toBe('bestProject');
+    expect(matchQuestion('Tell us about a project you’re proud of')?.id).toBe('bestProject');
     expect(matchQuestion('Describe a time you handled conflict')?.id).toBe('conflict');
     expect(matchQuestion('Cover letter')?.id).toBe('coverLetter');
   });
