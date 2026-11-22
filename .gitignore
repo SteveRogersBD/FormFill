@@ -6,3 +6,10 @@ dist/
 *.tsbuildinfo
 .firebase/
 screenshots/
+sa_creds.json
+
+# python service
+server/.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
