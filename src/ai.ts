@@ -12,6 +12,19 @@ const jobDescriptionSchema = z.string().trim().min(1).max(12_000);
 
 export interface AIField { id: string; label: string; type: string; }
 
+const DEVICE_START_TIMEOUT_MS = 25_000;
+const GENERATE_TIMEOUT_MS = 60_000;
+
+// A model that never answers must not leave the panel stuck on "Working…": every AI call is
+// bounded so the user gets a message and keeps their exact-match answers.
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string) {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_resolve, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(message)), timeoutMs);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
 function profileEvidence(label: string, profile: ResumeProfile) {
   const normalized = label.toLowerCase();
   if (/email|e-mail/.test(normalized)) return { email: profile.email };
@@ -37,14 +50,14 @@ function makePrompt(fields: AIField[], profile: ResumeProfile, cloud: boolean) {
 
 export async function suggestOnDeviceAnswers(fields: AIField[], profile: ResumeProfile) {
   const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), { mode: InferenceMode.ONLY_ON_DEVICE });
-  await model.initializeDeviceModel();
-  const result = await model.generateContent(makePrompt(fields, profile, false));
+  await withTimeout(model.initializeDeviceModel(), DEVICE_START_TIMEOUT_MS, 'On-device AI did not start. Chrome needs its built-in AI model ready first, or use cloud AI after approving it.');
+  const result = await withTimeout(model.generateContent(makePrompt(fields, profile, false)), GENERATE_TIMEOUT_MS, 'On-device AI stopped responding and was cancelled. Nothing was changed.');
   return { answers: validateAnswers(result.response.text(), fields), source: result.response.inferenceSource ?? 'ON_DEVICE' };
 }
 
 export async function suggestCloudAnswers(fields: AIField[], profile: ResumeProfile) {
   const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), { mode: InferenceMode.ONLY_IN_CLOUD });
-  const result = await model.generateContent(makePrompt(fields, profile, true));
+  const result = await withTimeout(model.generateContent(makePrompt(fields, profile, true)), GENERATE_TIMEOUT_MS, 'Cloud AI did not answer in time and was cancelled. Nothing was changed.');
   return { answers: validateAnswers(result.response.text(), fields), source: result.response.inferenceSource ?? 'IN_CLOUD' };
 }
 
@@ -65,8 +78,8 @@ async function draftCoverLetter(profile: ResumeProfile, jobDescription: string, 
   const description = jobDescriptionSchema.parse(jobDescription);
   const mode = onDevice ? InferenceMode.ONLY_ON_DEVICE : InferenceMode.ONLY_IN_CLOUD;
   const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), { mode });
-  if (onDevice) await model.initializeDeviceModel();
-  const result = await model.generateContent(makeCoverLetterPrompt(profile, description));
+  if (onDevice) await withTimeout(model.initializeDeviceModel(), DEVICE_START_TIMEOUT_MS, 'On-device AI did not start. Chrome needs its built-in AI model ready first, or use cloud AI after approving it.');
+  const result = await withTimeout(model.generateContent(makeCoverLetterPrompt(profile, description)), GENERATE_TIMEOUT_MS, 'AI drafting stopped responding and was cancelled. You can still write the letter yourself.');
   return {
     letter: coverLetterSchema.parse(result.response.text()),
     source: result.response.inferenceSource ?? (onDevice ? 'ON_DEVICE' : 'IN_CLOUD'),
