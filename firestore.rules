@@ -4,6 +4,22 @@ service cloud.firestore {
     match /users/{userId}/profile/{profileId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+    match /users/{userId}/preferences/{preferenceId} {
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow write: if request.auth != null && request.auth.uid == userId
+        && request.resource.data.keys().hasOnly([
+          'workAuthorized', 'requiresSponsorship', 'sponsorshipFuture', 'visaStatus', 'workAuthExpiry',
+          'citizenship', 'clearanceLevel', 'exportControlEligible', 'inJobCountry',
+          'desiredSalary', 'salaryCurrency', 'salaryPeriod', 'currentSalary',
+          'earliestStartDate', 'noticePeriod', 'willingToRelocate', 'remotePreference',
+          'travelWillingness', 'shiftAvailability', 'driversLicense',
+          'over18', 'backgroundCheckConsent', 'drugTestConsent', 'criminalRecord',
+          'criminalRecordExplanation', 'previouslyEmployedHere', 'relativeEmployedHere',
+          'boundByNonCompete', 'previouslyApplied', 'howDidYouHear',
+          'eeoOptIn', 'gender', 'pronouns', 'transgenderStatus', 'sexualOrientation',
+          'raceEthnicity', 'hispanicLatino', 'veteranStatus', 'disabilityStatus', 'updatedAt'
+        ]);
+    }
     match /users/{userId}/applications/{applicationId} {
       allow read, delete: if request.auth != null && request.auth.uid == userId;
       allow create: if request.auth != null && request.auth.uid == userId
