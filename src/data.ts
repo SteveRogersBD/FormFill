@@ -61,6 +61,18 @@ export async function getResumeUrl(path: string) {
   return getDownloadURL(ref(storage, path));
 }
 
+// Download in the extension, which has Storage host permission. A content script's
+// fetch runs under the application site's cross-origin restrictions.
+export async function getResumeAttachment(path: string) {
+  const response = await fetch(await getResumeUrl(path));
+  if (!response.ok) throw new Error('Could not download your saved resume. Open your profile and check the saved PDF.');
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (!bytes.length || bytes.length > 10 * 1024 * 1024) throw new Error('The saved resume is empty or exceeds 10 MB.');
+  let binary = '';
+  for (let offset = 0; offset < bytes.length; offset += 32768) binary += String.fromCharCode(...bytes.subarray(offset, offset + 32768));
+  return { data: btoa(binary), name: path.split('/').pop() || 'resume.pdf' };
+}
+
 export async function loadPreferences(uid: string): Promise<Preferences | null> {
   const { db } = await getFirebaseServices();
   const { doc, getDoc } = await import('firebase/firestore');

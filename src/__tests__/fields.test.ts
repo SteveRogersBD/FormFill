@@ -51,6 +51,9 @@ describe('findProfileValue', () => {
   });
 
   it('matches location, education, and current-role facts', () => {
+    expect(findProfileValue('Location', detailedProfile)).toBe('San Francisco, CA, United States');
+    expect(findProfileValue('ZipCode', detailedProfile)).toBe('94103');
+    expect(findProfileValue('Linked In profile', detailedProfile)).toBe('https://linkedin.com/in/jordan-lee');
     expect(findProfileValue('City', detailedProfile)).toBe('San Francisco');
     expect(findProfileValue('State', detailedProfile)).toBe('CA');
     expect(findProfileValue('Zip code', detailedProfile)).toBe('94103');
@@ -59,6 +62,12 @@ describe('findProfileValue', () => {
     expect(findProfileValue('Major / Field of Study', detailedProfile)).toBe('Computer Science');
     expect(findProfileValue('Current company', detailedProfile)).toBe('Northstar Studio');
     expect(findProfileValue('Job title', detailedProfile)).toBe('Product Designer');
+  });
+
+  it('leaves missing saved contact details empty', () => {
+    expect(findProfileValue('Zip Code', emptyProfile())).toBeUndefined();
+    expect(findProfileValue('LinkedIn Profile', emptyProfile())).toBeUndefined();
+    expect(findProfileValue('Location', { ...emptyProfile(), state: 'CA' })).toBeUndefined();
   });
 
   it('keeps the applicant name out of company and school name fields', () => {

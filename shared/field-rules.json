@@ -9,7 +9,7 @@
     { "pattern": "\\b(last|family|sur) ?name\\b", "key": "lastName" },
     { "pattern": "\\b(e mail|email)\\b", "key": "email" },
     { "pattern": "\\b(phone|mobile|telephone|cell)\\b", "key": "phone" },
-    { "pattern": "\\blinkedin\\b", "key": "linkedin" },
+    { "pattern": "\\b(linkedin|linked in)\\b", "key": "linkedin" },
     { "pattern": "\\b(github|gitlab|portfolio|personal website|website|url)\\b", "key": "portfolio" },
     { "pattern": "\\b(university|college|school|institution)\\b", "key": "university" },
     { "pattern": "\\b(major|field of study|discipline|concentration)\\b", "key": "major" },
@@ -24,12 +24,12 @@
     { "pattern": "\\b(achievements|awards|honors)\\b", "key": "achievements" },
     { "pattern": "\\b(city|town|location)\\b", "key": "city", "guard": "notALocationChoice" },
     { "pattern": "\\b(state|province|region)\\b", "key": "state" },
-    { "pattern": "\\b(zip|postal code|postcode)\\b", "key": "postalCode" },
+    { "pattern": "\\b(zip|zipcode|postal code|postalcode|postcode)\\b", "key": "postalCode" },
     { "pattern": "\\bcountry\\b", "key": "country" },
     { "pattern": "\\b(full|preferred|legal|your) name\\b", "key": "fullName" },
     { "pattern": "\\bname\\b", "key": "fullName", "guard": "notAnApplicantName" }
   ],
-  "sensitivePattern": "salary|compensation|sponsorship|visa|work authorization|authorized to work|citizenship|citizen|background check|security clearance|relocat|criminal|disability|medical|health|veteran|military|gender|pronoun|race|ethnicity|sexual orientation|consent|certify|attest|terms and conditions",
+  "sensitivePattern": "salary|compensation|sponsor|visa|work authorization|authorized to work|citizenship|citizen|background check|security clearance|relocat|criminal|disability|medical|health|veteran|military|gender|pronoun|race|ethnicity|sexual orientation|consent|certify|attest|acknowledge|arbitration|terms and conditions",
   "coverLetterPattern": "\\bcover letter\\b|\\bletter of (?:interest|motivation)\\b|\\bstatement of interest\\b",
   "preferenceAnswers": {
     "yes": "Yes",

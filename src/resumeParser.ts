@@ -37,7 +37,7 @@ function cleanLines(text: string) {
 }
 
 function parseResumeLocation(lines: string[]) {
-  for (const line of lines.slice(0, 8)) {
+  for (const line of lines.slice(0, 8).flatMap((line) => line.split(/\s*[|•]\s*/))) {
     const match = line.match(/^([A-Z][A-Za-z .'-]{1,40}),\s*([A-Za-z][A-Za-z .'-]{1,30}?)(?:\s+(\d{5}(?:-\d{4})?))?$/);
     if (!match) continue;
     const city = match[1].trim();
@@ -88,7 +88,7 @@ export function extractProfileFromText(text: string): ResumeProfile {
     return digits >= 7 && digits <= 15 && !/\b(?:19|20)\d{2}\s*[-–—]\s*(?:19|20)\d{2}\b/.test(candidate);
   })?.trim() ?? '';
   profile.linkedin = text.match(/(?:https?:\/\/)?(?:www\.)?linkedin\.com\/(?:in|pub)\/[\w-]+/i)?.[0] ?? '';
-  const urls = [...text.matchAll(/https?:\/\/[^\s)>,]+/g)].map((match) => match[0].replace(/[.,;]+$/, ''));
+  const urls = [...text.matchAll(/(?:https?:\/\/|www\.|(?:github\.com|gitlab\.com)\/)[^\s)>,]+/g)].map((match) => match[0].replace(/[.,;]+$/, ''));
   profile.portfolio = urls.find((url) => !/linkedin\.com/i.test(url)) ?? '';
   profile.university = lines.find((line) => /\b(university|college|institute|polytechnic)\b/i.test(line)) ?? '';
 
@@ -138,10 +138,18 @@ export async function extractProfile(file: File): Promise<ResumeProfile> {
   const bytes = await file.arrayBuffer();
   const document = await pdfjs.getDocument({ data: bytes }).promise;
   const pageTexts: string[] = [];
+  const links: string[] = [];
   for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
     const page = await document.getPage(pageNumber);
     const content = await page.getTextContent();
     pageTexts.push(content.items.map((item) => 'str' in item ? `${item.str}${'hasEOL' in item && item.hasEOL ? '\n' : ' '}` : '').join(''));
+    // Many PDFs show "LinkedIn" or "Portfolio" while keeping the URL only in a link annotation.
+    for (const annotation of await page.getAnnotations()) {
+      if (typeof annotation.url === 'string' && /^https?:\/\//i.test(annotation.url)) links.push(annotation.url);
+    }
   }
-  return extractProfileFromText(pageTexts.join('\n'));
+  const profile = extractProfileFromText(pageTexts.join('\n'));
+  if (!profile.linkedin) profile.linkedin = links.find((url) => /^(?:https?:\/\/)(?:www\.)?linkedin\.com\/(in|pub)\//i.test(url)) ?? '';
+  if (!profile.portfolio) profile.portfolio = links.find((url) => !/linkedin\.com/i.test(url)) ?? '';
+  return profile;
 }

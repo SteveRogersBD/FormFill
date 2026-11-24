@@ -32,6 +32,11 @@ Recognized for inclusive product design.
 `;
 
 describe('extractProfileFromText', () => {
+  it('reads inline contact locations and links without a URL scheme', () => {
+    expect(extractProfileFromText('Jane Doe\njane@example.com | Chicago, IL 60601 | +1 555 212 5555\nwww.janedoe.dev\nlinkedin.com/in/jane-doe')).toMatchObject({
+      city: 'Chicago', state: 'IL', postalCode: '60601', portfolio: 'www.janedoe.dev', linkedin: 'linkedin.com/in/jane-doe',
+    });
+  });
   it('extracts the resume profile details for review', () => {
     expect(extractProfileFromText(resumeText)).toMatchObject({
       fullName: 'Jane Doe',

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { User } from 'firebase/auth';
 import { findProfileValue, isCoverLetterField, isSensitiveField } from './fields';
-import { getResumeUrl, listApplications, loadPreferences, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
+import { getResumeAttachment, listApplications, loadPreferences, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
 import { emptyProfile, type ResumeProfile } from './profile';
 import { emptyPreferences, type Preferences } from './preferences';
 import { matchQuestion, questionAnswer } from './questions';
@@ -31,6 +31,11 @@ async function scanFrame(tabId: number, frameId: number): Promise<ApplicationSca
 }
 
 type ScanAttempt = { scan: ApplicationScan } | { permissionOrigin: string };
+
+function savedAnswer(label: string, profile: ResumeProfile, preferences: Preferences) {
+  const question = matchQuestion(label);
+  return question ? questionAnswer(question, preferences) : findProfileValue(label, profile) ?? '';
+}
 
 async function scanActivePage(tabId: number): Promise<ScanAttempt> {
   const topScan = await scanFrame(tabId, 0);
@@ -101,10 +106,9 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   }, [refreshProfile]);
 
   const answerFor = useCallback((label: string) => {
-    const question = matchQuestion(label);
     // A taxonomy hit is authoritative: an open-ended question must not be answered with a
     // profile list just because no standing answer exists yet.
-    return question ? questionAnswer(question, preferences) : findProfileValue(label, profile) ?? '';
+    return savedAnswer(label, profile, preferences);
   }, [preferences, profile]);
   const suggestions = useMemo(() => scan?.fields.map((field) => ({ field, suggested: answerFor(field.label) })) ?? [], [scan, answerFor]);
   const coverLetterField = scan?.fields.find((field) => isCoverLetterField(field.label) && ['text', 'textarea'].includes(field.type));
@@ -126,10 +130,14 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         setNotice('The application is embedded on another site. Approve access to that site to scan its form.');
         return;
       }
+      const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid).catch(() => null)]);
+      const currentProfile = latestProfile ?? emptyProfile();
+      const currentPreferences = latestPreferences ?? emptyPreferences();
+      setProfile(currentProfile); setPreferences(currentPreferences);
       const result = attempt.scan; setScan(result);
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
-      setValues(Object.fromEntries(result.fields.map((field) => [field.id, answerFor(field.label)])));
+      setValues(Object.fromEntries(result.fields.map((field) => [field.id, savedAnswer(field.label, currentProfile, currentPreferences)])));
       const pageType = result.platform === 'greenhouse' ? ' on this Greenhouse application' : '';
       setNotice(result.fields.length ? `Found ${result.fields.length} fields${pageType}. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not inspect this page.'); }
@@ -166,23 +174,26 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         frameValues[field.frameFieldId ?? field.id] = value;
         valuesByFrame.set(field.frameId ?? 0, frameValues);
       }
-      // A resume upload is a file, not a value, so it travels as a download URL the content
-      // script turns back into a File on the page.
+      // Only the detected resume question receives the PDF; other uploads stay manual.
       const resumeField = scan.fields.find((field) => field.type === 'file' && /\b(resume|cv|curriculum)\b/i.test(field.label));
-      const resumeUrl = resumeField && profile.resumePath ? await getResumeUrl(profile.resumePath).catch(() => '') : '';
-      const resume = resumeField && resumeUrl
-        ? { fieldId: resumeField.frameFieldId ?? resumeField.id, url: resumeUrl, name: profile.resumePath.split('/').pop() ?? 'resume.pdf' }
-        : undefined;
+      let resume: { fieldId: string; data: string; name: string } | undefined;
+      let resumeError = '';
+      if (resumeField && profile.resumePath) {
+        try { resume = { fieldId: resumeField.frameFieldId ?? resumeField.id, ...await getResumeAttachment(profile.resumePath) }; }
+        catch (reason) { resumeError = reason instanceof Error ? reason.message : 'Could not download your resume.'; }
+      }
       if (resume && resumeField) valuesByFrame.set(resumeField.frameId ?? 0, valuesByFrame.get(resumeField.frameId ?? 0) ?? {});
       const results = await Promise.all([...valuesByFrame].map(async ([frameId, frameValues]) =>
         await chrome.tabs.sendMessage(tab.id, {
           type: 'APPLYAI_FILL_FIELDS',
           values: frameValues,
           resume: resumeField && (resumeField.frameId ?? 0) === frameId ? resume : undefined,
-        }, { frameId }) as { filled: number },
+        }, { frameId }) as { filled: number; failed?: string[] },
       ));
       const filledCount = results.reduce((total, result) => total + result.filled, 0);
       setFilled(filledCount > 0);
+      const failedCount = results.reduce((total, result) => total + (result.failed?.length ?? 0), 0);
+      if (failedCount || resumeError) setError([resumeError, failedCount ? `${failedCount} field(s) could not be filled, including any unmatched location option. Review the page and complete them manually.` : ''].filter(Boolean).join(' '));
       setNotice(filledCount ? `Filled ${filledCount} field${filledCount === 1 ? '' : 's'}. Check the application before continuing.` : 'Nothing was filled. Add or edit answers with values, then try again.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not fill this page. Try scanning it again.'); }
     finally { setBusy(false); }
@@ -261,7 +272,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
           : <input id={`answer-${field.id}`} value={values[field.id] ?? ''} disabled={unsupported} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />}
         {sensitive && <label className="confirm-sensitive"><input type="checkbox" checked={Boolean(confirmed[field.id])} onChange={(event) => setConfirmed((current) => ({ ...current, [field.id]: event.target.checked }))} /> I reviewed this sensitive answer.</label>}
         {unsupported && <span className="field-hint">{field.type === 'file'
-          ? profile.resumePath ? 'Your saved resume is attached when you fill.' : 'Upload a resume in your profile to attach it automatically.'
+          ? /\b(resume|cv|curriculum)\b/i.test(field.label) ? profile.resumePath ? 'ApplyAI will try to attach your saved resume when you fill.' : 'Upload a resume in your profile to attach it automatically.' : 'Attach this file manually on the application page.'
           : 'This field type needs your attention on the page.'}</span>}
         {!suggested && !values[field.id] && !unsupported && <span className="field-hint">No saved answer yet. Add it under <a href="dashboard.html#standing-answers" target="_blank">standing answers ↗</a>.</span>}
       </div>;
