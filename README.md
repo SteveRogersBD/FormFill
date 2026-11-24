@@ -41,7 +41,7 @@ The Vite server gives you the dashboard for UI work. For the extension, run `npm
 1. Open ApplyAI and sign in with Google.
 2. Upload a text-based PDF resume. The browser extracts a first pass for name, email, phone, links, location, education (degree and major), current role, skills, experience, projects, and achievements. Add your target role in the dashboard as a guided profile detail. Scanned image-only PDFs need OCR, which is not included. You can still edit or enter details manually.
 3. Review and edit all fields, then save. The PDF is uploaded to `resumes/<uid>/...`; profile JSON is saved under `users/<uid>/profile/current`.
-4. Open the demo form at `https://<project-id>.web.app/test-form.html` or from the Vite server. Click the extension icon to open the side panel, scan, edit suggestions, and fill. If a cover-letter field is detected, paste the job description to draft a letter on-device; cloud drafting requires its separate consent checkbox. Review and edit the draft before placing it in the form. Sensitive fields stay blank until you enter and confirm them. The extension never submits the form.
+4. Open the demo form at `https://<project-id>.web.app/test-form.html` or from the Vite server. Click the extension icon to open the side panel, then **Scan and analyze with AI**. The extension loads your latest saved profile, scans the current form, runs its on-device planner, and shows answers and their supporting facts. Optionally enable **Allow cloud fallback** before scanning to retry unresolved questions in the cloud. Edit answers, approve sensitive answers and written drafts, then choose **Fill reviewed answers**. The extension never submits the form. Cover-letter tailoring is deferred; complete those fields manually.
 5. After manually submitting a real application, use **I submitted this application** to save it. The dashboard lets you change status or delete the record.
 
 ## Site access
@@ -50,9 +50,15 @@ Open ApplyAI from its toolbar icon while the job page is active. On the first sc
 
 ## AI behavior
 
-Exact profile matches work without AI. The side panel also offers a local-only AI suggestion action; it requires a supported desktop Chrome version and an available on-device model. If it is unavailable, ApplyAI reports that and deterministic autofill continues to work. Cloud suggestions require the separate consent checkbox and send the form labels plus relevant profile snippets to Firebase AI Logic. Enable AI Logic and configure/enforce Firebase App Check in the Firebase console before using this option. ApplyAI does not switch to cloud automatically.
+The extension runs a LangGraph workflow: **saved facts → on-device planning → approved cloud fallback for unresolved fields → validation and review**. LangChain Core runnables wrap the Firebase model calls and structured JSON parsing. This graph runs inside the side panel; the separate Python session API is not involved in this flow and no Python server is required.
 
-When a scanned form requests a cover letter, the side panel can draft one from a pasted job description and relevant career details in the reviewed profile. The draft stays editable in the extension until you choose **Use draft in application field**. Cloud drafting requires separate consent and Firebase App Check; ApplyAI does not switch from on-device to cloud automatically.
+The model sees the current form's labels, instructions, required flags, options, job context, and reviewed profile facts. It maps unfamiliar questions to saved fact keys rather than generating contact or location values. Standing-answer **values** remain local; the model receives their field catalog, and the extension resolves the selected keys after inference. Unknown facts stay unanswered. Recognized open-ended career questions can receive drafts with evidence references, but those require explicit review. Evidence references do not prove a draft's truthfulness; users must check every claim.
+
+Local inference uses Firebase AI Logic `ONLY_ON_DEVICE`. If it is unavailable, saved-answer filling continues. When the cloud consent checkbox is enabled, unresolved fields can use `ONLY_IN_CLOUD`. This explicit graph routing avoids unapproved SDK fallback. Both providers use constrained structured output and the same Zod validator. Cloud consent includes contact and location details in the reviewed profile and the current form's context. There is no remote graph checkpoint or LangSmith tracing configured.
+
+Enable Firebase AI Logic for your project and configure/enforce Firebase App Check before using cloud fallback. `VITE_FIREBASE_AI_MODEL` optionally overrides the cloud model (default `gemini-3.5-flash-lite`); choose a model enabled for your project. On-device inference requires a compatible desktop Chrome installation and its downloaded model. Unit tests use mocked inference providers; they do not establish that a particular Chrome installation or Firebase project can run live inference.
+
+Use **Analyze answers again** after allowing cloud fallback or saving new profile facts. It reloads your profile and preserves answers you manually edited in the panel. A fresh **Scan and analyze again** starts a new review and resets edits and confirmations. Newly revealed or subsequent application steps need another scan. Resume and cover-letter tailoring are outside this phase; existing saved-resume attachment remains available.
 
 ## Checks
 
@@ -61,9 +67,11 @@ npm run typecheck
 npm run build
 ```
 
-Greenhouse hosted job applications on `boards.greenhouse.io` and `job-boards.greenhouse.io` are the first ATS target. ApplyAI reads accessible native form controls there, as it does in the controlled test form. Complex widgets, cross-origin iframes, and resume file uploads require manual handling.
+The scanner supports accessible native controls and Ashby question containers, Yes/No button choices and location autocomplete. Greenhouse hosted forms are also recognized. This does not guarantee every custom widget is supported. Embedded ATS frames require their own site access. Saved resume PDFs can be attached to a detected native resume file control; other uploads need manual handling. A semantic AI match does not guarantee that an ATS widget will accept the answer; check any fill failure in the panel and on the page.
 
 For cloud AI, register the web app with Firebase App Check and configure its reCAPTCHA v3 site key as `VITE_FIREBASE_APPCHECK_SITE_KEY`. For local development only, set `VITE_FIREBASE_APPCHECK_DEBUG=true`, run the extension, and register the generated debug token in Firebase App Check. Never ship the debug setting or token.
+
+Unpacked extension development uses an App Check custom provider while debug mode is enabled. Firebase still exchanges the registered debug token with its App Check service; the custom provider prevents reCAPTCHA's remote script from loading inside the extension, where Manifest V3 blocks it. If the console reports a rejected debug token, register that extension's token under **Firebase Console → App Check → your web app → Manage debug tokens**, then reload. Keep the token private. Turning debug mode off for a public extension release requires an extension-compatible production attestation flow; direct reCAPTCHA initialization is for hosted web pages.
 
 
 Run the automated unit tests with `npm test`.

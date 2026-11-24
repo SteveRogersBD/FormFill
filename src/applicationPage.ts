@@ -10,6 +10,7 @@ export interface ApplicationScan {
   company: string;
   role: string;
   applicationFrameOrigins?: string[];
+  description?: string;
 }
 
 export function isGreenhouseHost(hostname: string): boolean {

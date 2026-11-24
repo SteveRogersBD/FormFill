@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { PlannerResult } from './planner';
 import type { User } from 'firebase/auth';
-import { findProfileValue, isCoverLetterField, isSensitiveField } from './fields';
+import { findProfileValue, isSensitiveField } from './fields';
 import { getResumeAttachment, listApplications, loadPreferences, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
-import { emptyProfile, type ResumeProfile } from './profile';
-import { emptyPreferences, type Preferences } from './preferences';
+import { emptyProfile, PROFILE_FIELDS, type ResumeProfile } from './profile';
+import { emptyPreferences, PREFERENCE_FIELDS, type Preferences } from './preferences';
 import { matchQuestion, questionAnswer } from './questions';
 import { firebaseAppCheckReady } from './firebase';
 import { hostPermissionPattern, type ApplicationScan } from './applicationPage';
@@ -37,6 +38,13 @@ function savedAnswer(label: string, profile: ResumeProfile, preferences: Prefere
   return question ? questionAnswer(question, preferences) : findProfileValue(label, profile) ?? '';
 }
 
+function evidenceLabel(path: string) {
+  const [section, key] = path.split('.');
+  if (section === 'preferences') return PREFERENCE_FIELDS.find((field) => field.key === key)?.label ?? 'Saved standing answer';
+  if (section === 'profile') return PROFILE_FIELDS.find((field) => field.key === key)?.label ?? 'Saved profile';
+  return 'Reviewed profile';
+}
+
 async function scanActivePage(tabId: number): Promise<ScanAttempt> {
   const topScan = await scanFrame(tabId, 0);
   for (const origin of topScan.applicationFrameOrigins ?? []) {
@@ -64,6 +72,7 @@ async function scanActivePage(tabId: number): Promise<ScanAttempt> {
       platform: applicationFrame?.scan.platform ?? primary.platform,
       company: applicationFrame?.scan.company || primary.company,
       role: applicationFrame?.scan.role || primary.role,
+      description: applicationFrame?.scan.description || primary.description,
     },
   };
 }
@@ -85,10 +94,30 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const [filled, setFilled] = useState(false);
   const [cloudConsent, setCloudConsent] = useState(false);
   const [inferenceSource, setInferenceSource] = useState('');
-  const [coverLetterCloudConsent, setCoverLetterCloudConsent] = useState(false);
-  const [jobDescription, setJobDescription] = useState('');
-  const [coverLetterDraft, setCoverLetterDraft] = useState('');
-  const [coverLetterSource, setCoverLetterSource] = useState('');
+  const [plan, setPlan] = useState<PlannerResult | null>(null);
+  const editedFields = useRef(new Set<string>());
+
+  const editAnswer = (id: string, value: string) => {
+    editedFields.current.add(id);
+    setValues((current) => ({ ...current, [id]: value }));
+    setConfirmed((current) => ({ ...current, [id]: false }));
+  };
+
+  const analyze = async (application: ApplicationScan, currentProfile: ResumeProfile, currentPreferences: Preferences) => {
+    const { planApplication } = await import('./plannerModel');
+    const result = await planApplication({
+      fields: application.fields, profile: currentProfile, preferences: currentPreferences,
+      job: { company: application.company, role: application.role, description: application.description },
+      allowCloud: cloudConsent && firebaseAppCheckReady,
+    }, setNotice);
+    setPlan(result);
+    setValues((current) => ({ ...current, ...Object.fromEntries(result.entries.filter((entry) => !editedFields.current.has(entry.fieldId)).map((entry) => [entry.fieldId, entry.value])) }));
+    setConfirmed({});
+    const sources = [...new Set(result.entries.filter((entry) => entry.value).map((entry) => entry.source))];
+    setInferenceSource(sources.map((source) => source === 'ON_DEVICE' ? 'On-device AI' : source === 'IN_CLOUD' ? 'Cloud AI (approved)' : 'Saved facts').join(' · '));
+    const ready = result.entries.filter((entry) => entry.value).length;
+    setNotice(`${ready} of ${application.fields.length} questions have answers. Review them, then fill. Remaining questions need your input or manual handling.`);
+  };
 
   const refreshProfile = useCallback(async () => {
     setLoading(true);
@@ -111,11 +140,9 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     return savedAnswer(label, profile, preferences);
   }, [preferences, profile]);
   const suggestions = useMemo(() => scan?.fields.map((field) => ({ field, suggested: answerFor(field.label) })) ?? [], [scan, answerFor]);
-  const coverLetterField = scan?.fields.find((field) => isCoverLetterField(field.label) && ['text', 'textarea'].includes(field.type));
   const scanPage = async () => {
     setBusy(true); setError(''); setNotice(''); setFilled(false);
-    setScan(null); setValues({}); setConfirmed({}); setCloudConsent(false); setInferenceSource('');
-    setJobDescription(''); setCoverLetterDraft(''); setCoverLetterSource(''); setCoverLetterCloudConsent(false);
+    setScan(null); setValues({}); setConfirmed({}); setInferenceSource(''); setPlan(null); editedFields.current.clear();
     try {
       const tab = await getActiveApplicationTab();
       if (!tab.hasSiteAccess) {
@@ -140,6 +167,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       setValues(Object.fromEntries(result.fields.map((field) => [field.id, savedAnswer(field.label, currentProfile, currentPreferences)])));
       const pageType = result.platform === 'greenhouse' ? ' on this Greenhouse application' : '';
       setNotice(result.fields.length ? `Found ${result.fields.length} fields${pageType}. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
+      if (result.fields.length) await analyze(result, currentProfile, currentPreferences);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not inspect this page.'); }
     finally { setBusy(false); }
   };
@@ -169,7 +197,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       for (const [id, value] of Object.entries(values)) {
         const field = scan.fields.find((candidate) => candidate.id === id);
         if (!field || ['file', 'password', 'select-multiple'].includes(field.type)
-          || !value.trim() || (isSensitiveField(field.label) && !confirmed[id])) continue;
+          || !value.trim() || ((isSensitiveField(field.label) || plan?.entries.find((entry) => entry.fieldId === id)?.requiresConfirmation) && !confirmed[id])) continue;
         const frameValues = valuesByFrame.get(field.frameId ?? 0) ?? {};
         frameValues[field.frameFieldId ?? field.id] = value;
         valuesByFrame.set(field.frameId ?? 0, frameValues);
@@ -199,42 +227,17 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     finally { setBusy(false); }
   };
 
-  const suggestWithAI = async (cloud: boolean) => {
-    if (!scan || (cloud && (!cloudConsent || !firebaseAppCheckReady))) return;
-    setBusy(true); setError(''); setNotice('');
+  const reanalyze = async () => {
+    if (!scan) return;
+    setBusy(true); setError('');
     try {
-      const { suggestCloudAnswers, suggestOnDeviceAnswers } = await import('./ai');
-      const result = cloud
-        ? await suggestCloudAnswers(scan.fields, profile)
-        : await suggestOnDeviceAnswers(scan.fields, profile);
-      setValues((current) => ({ ...result.answers, ...Object.fromEntries(Object.entries(current).filter(([, value]) => value.trim())) }));
-      setInferenceSource(result.source === 'ON_DEVICE' ? 'On-device AI' : 'Cloud AI (approved)');
-      setNotice('AI suggestions are ready. Check and edit each answer before filling the page.');
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'AI suggestions are unavailable. You can still use exact profile matches.');
-    } finally { setBusy(false); }
-  };
-
-  const createCoverLetterDraft = async (cloud: boolean) => {
-    if (!coverLetterField || !jobDescription.trim() || (cloud && (!coverLetterCloudConsent || !firebaseAppCheckReady))) return;
-    setBusy(true); setError(''); setNotice('');
-    try {
-      const { draftCoverLetterInCloud, draftCoverLetterOnDevice } = await import('./ai');
-      const result = cloud
-        ? await draftCoverLetterInCloud(profile, jobDescription)
-        : await draftCoverLetterOnDevice(profile, jobDescription);
-      setCoverLetterDraft(result.letter);
-      setCoverLetterSource(result.source === 'ON_DEVICE' ? 'On-device AI' : 'Cloud AI (approved)');
-      setNotice('Draft ready. Review and edit it before using it in the application.');
-    } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'Could not draft a cover letter. You can still write your answer manually.');
-    } finally { setBusy(false); }
-  };
-
-  const useCoverLetterDraft = () => {
-    if (!coverLetterField || !coverLetterDraft.trim()) return;
-    setValues((current) => ({ ...current, [coverLetterField.id]: coverLetterDraft.trim() }));
-    setNotice('Draft added to the cover-letter answer. Review it, then fill the application.');
+      const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid).catch(() => null)]);
+      const currentProfile = latestProfile ?? emptyProfile(); const currentPreferences = latestPreferences ?? emptyPreferences();
+      setProfile(currentProfile); setPreferences(currentPreferences);
+      await analyze(scan, currentProfile, currentPreferences);
+    }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not analyze the application. Saved answers are still available.'); }
+    finally { setBusy(false); }
   };
 
   const confirmSubmitted = async () => {
@@ -260,33 +263,32 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     <section className="panel-intro"><p className="eyebrow">APPLICATION ASSISTANT</p><h1>Let’s fill this out.</h1><p className="muted">Your profile stays yours. You choose what gets filled.</p></section>
     {error && <div className="notice error compact-notice" role="alert">{error}</div>}{notice && <div className="notice success compact-notice" role="status">{notice}</div>}
     {!loading && !profile.updatedAt && <div className="notice info compact-notice">Set up your resume profile before scanning. Use <strong>Set up profile</strong> above, then <button className="text-button" onClick={refreshProfile}>refresh the profile here</button>.</div>}
-    <button className="button primary wide scan-button" onClick={scanPage} disabled={loading || busy || !profile.updatedAt}>{busy ? 'Working…' : scan ? 'Scan page again' : 'Scan this application'}</button>
+    <div className="ai-settings"><label className="cloud-consent"><input type="checkbox" checked={cloudConsent} disabled={busy || !firebaseAppCheckReady} onChange={(event) => setCloudConsent(event.target.checked)} /> Allow cloud fallback for this application. This sends question labels, options, job context, and reviewed profile facts (including contact and location details) to Firebase AI Logic. Standing-answer values stay on this device.</label>
+    <p className="field-hint">On-device AI runs first. Cloud AI is used only for unresolved questions when you approve it.{!firebaseAppCheckReady && ' Cloud fallback needs Firebase App Check configured.'}</p></div>
+    {plan && <section className="notice info compact-notice" aria-label="AI analysis results">
+      <strong>Analysis complete</strong>
+      <p className="field-hint">{plan.attempts.length ? `Attempted: ${plan.attempts.map((source) => source === 'ON_DEVICE' ? 'on-device' : 'cloud').join(' → ')}` : 'No AI needed for these controls.'}</p>
+      {plan.warnings.map((warning) => <p className="field-hint" key={warning}>{warning}</p>)}
+    </section>}
+    <button className="button primary wide scan-button" onClick={scanPage} disabled={loading || busy || !profile.updatedAt}>{busy ? 'Working…' : scan ? 'Scan and analyze again' : 'Scan and analyze with AI'}</button>
     {siteAccessRequest && <section className="panel-section site-access-card"><p className="field-hint">ApplyAI needs permission to read this application page on <strong>{siteAccessRequest.hostname}</strong>.</p><button className="button secondary wide" onClick={grantSiteAccess} disabled={busy}>Allow access to {siteAccessRequest.hostname}</button><p className="field-hint">Chrome will ask you to approve access to this site only.</p></section>}
     {suggestions.length > 0 && <section className="panel-section"><div className="panel-section-heading"><h2>Review answers</h2><span>{suggestions.length} fields</span></div>{inferenceSource && <div className="inference-badge">✦ {inferenceSource}</div>}<div className="answer-list">{suggestions.map(({ field, suggested }) => {
-      const sensitive = isSensitiveField(field.label);
+      const planned = plan?.entries.find((entry) => entry.fieldId === field.id);
+      const sensitive = isSensitiveField(field.label) || planned?.requiresConfirmation;
       const unsupported = ['file', 'password', 'select-multiple'].includes(field.type);
       return <div className="answer-row" key={field.id}><label className="answer-label" htmlFor={`answer-${field.id}`}>{field.label || 'Unlabeled field'}{field.required && <i>Required</i>}</label>
-        {['radio', 'select', 'choice'].includes(field.type) && field.options.length > 0 ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">Choose an option</option>{field.options.map((option) => <option key={option}>{option}</option>)}</select>
-          : field.type === 'checkbox' ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))}><option value="">Leave unchanged</option><option value="true">Check this box</option></select>
-          : field.type === 'textarea' ? <textarea id={`answer-${field.id}`} rows={4} value={values[field.id] ?? ''} disabled={unsupported} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />
-          : <input id={`answer-${field.id}`} value={values[field.id] ?? ''} disabled={unsupported} onChange={(event) => setValues((current) => ({ ...current, [field.id]: event.target.value }))} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />}
-        {sensitive && <label className="confirm-sensitive"><input type="checkbox" checked={Boolean(confirmed[field.id])} onChange={(event) => setConfirmed((current) => ({ ...current, [field.id]: event.target.checked }))} /> I reviewed this sensitive answer.</label>}
+        {['radio', 'select', 'choice'].includes(field.type) && field.options.length > 0 ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => editAnswer(field.id, event.target.value)}><option value="">Choose an option</option>{field.options.map((option) => <option key={option}>{option}</option>)}</select>
+          : field.type === 'checkbox' ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => editAnswer(field.id, event.target.value)}><option value="">Leave unchanged</option><option value="true">Check this box</option></select>
+          : field.type === 'textarea' ? <textarea id={`answer-${field.id}`} rows={4} value={values[field.id] ?? ''} disabled={unsupported} onChange={(event) => editAnswer(field.id, event.target.value)} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />
+          : <input id={`answer-${field.id}`} value={values[field.id] ?? ''} disabled={unsupported} onChange={(event) => editAnswer(field.id, event.target.value)} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />}
+        {planned && <p className="field-hint">{editedFields.current.has(field.id) ? 'Edited by you.' : planned.reason}{planned.evidence.length > 0 && !editedFields.current.has(field.id) ? ` Source: ${planned.evidence.map(evidenceLabel).join(', ')}` : ''}</p>}
+        {sensitive && <label className="confirm-sensitive"><input type="checkbox" checked={Boolean(confirmed[field.id])} onChange={(event) => setConfirmed((current) => ({ ...current, [field.id]: event.target.checked }))} /> I reviewed and approve this answer.</label>}
         {unsupported && <span className="field-hint">{field.type === 'file'
           ? /\b(resume|cv|curriculum)\b/i.test(field.label) ? profile.resumePath ? 'ApplyAI will try to attach your saved resume when you fill.' : 'Upload a resume in your profile to attach it automatically.' : 'Attach this file manually on the application page.'
           : 'This field type needs your attention on the page.'}</span>}
-        {!suggested && !values[field.id] && !unsupported && <span className="field-hint">No saved answer yet. Add it under <a href="dashboard.html#standing-answers" target="_blank">standing answers ↗</a>.</span>}
+        {!suggested && !values[field.id] && !unsupported && <span className="field-hint">Add a missing fact in your <a href="dashboard.html" target="_blank">profile or standing answers ↗</a>, or type an answer here.</span>}
       </div>;
-    })}</div><button className="button secondary wide ai-button" onClick={() => suggestWithAI(false)} disabled={busy}>✦ Suggest with on-device AI</button><label className="cloud-consent"><input type="checkbox" checked={cloudConsent} onChange={(event) => setCloudConsent(event.target.checked)} /> I approve sending this form’s field labels and relevant profile details to Firebase AI Logic for cloud suggestions.</label>{!firebaseAppCheckReady && <p className="field-hint">Cloud AI needs a Firebase App Check site key in your local configuration.</p>}<button className="text-button cloud-button" onClick={() => suggestWithAI(true)} disabled={busy || !cloudConsent || !firebaseAppCheckReady}>Use cloud AI with my approval ↗</button><button className="button primary wide fill-button" onClick={fillPage} disabled={busy}>{busy ? 'Working…' : 'Fill reviewed answers'}</button><p className="fine-print center">ApplyAI never submits the application for you.</p></section>}
-    {coverLetterField && <section className="panel-section cover-letter-section">
-      <div className="panel-section-heading"><h2>Cover letter requested</h2>{coverLetterSource && <span>{coverLetterSource}</span>}</div>
-      <p className="field-hint">Paste the job description. The draft uses only your reviewed career details and stays here for you to review.</p>
-      <label className="form-field"><span>Job description</span><textarea rows={5} maxLength={12000} value={jobDescription} onChange={(event) => { setJobDescription(event.target.value); setCoverLetterDraft(''); setCoverLetterSource(''); }} placeholder="Paste the job description here" /></label>
-      <button className="button secondary wide ai-button" onClick={() => createCoverLetterDraft(false)} disabled={busy || !jobDescription.trim()}>Draft on this device</button>
-      <label className="cloud-consent"><input type="checkbox" checked={coverLetterCloudConsent} onChange={(event) => setCoverLetterCloudConsent(event.target.checked)} /> I approve sending the job description and career details from my profile to Firebase AI Logic for a cover letter draft.</label>
-      {!firebaseAppCheckReady && <p className="field-hint">Cloud AI needs a Firebase App Check site key in your local configuration.</p>}
-      <button className="text-button cloud-button" onClick={() => createCoverLetterDraft(true)} disabled={busy || !jobDescription.trim() || !coverLetterCloudConsent || !firebaseAppCheckReady}>Draft with cloud AI after approval</button>
-      {coverLetterDraft && <><label className="form-field"><span>Review and edit the draft</span><textarea rows={8} value={coverLetterDraft} onChange={(event) => setCoverLetterDraft(event.target.value)} /></label><button className="button primary wide" onClick={useCoverLetterDraft} disabled={busy}>Use draft in application field</button></>}
-    </section>}
+    })}</div><button className="button secondary wide ai-button" onClick={reanalyze} disabled={busy}>Analyze answers again</button><button className="button primary wide fill-button" onClick={fillPage} disabled={busy}>{busy ? 'Working…' : 'Fill reviewed answers'}</button><p className="fine-print center">ApplyAI never submits the application for you.</p></section>}
     {scan && <section className="confirm-card"><p className="eyebrow">{filled ? 'AFTER YOU SUBMIT' : 'APPLICATION TRACKING'}</p><h2>{filled ? 'Applied? Save it here.' : 'Submitted this application?'}</h2><label className="form-field"><span>Company</span><input value={company} onChange={(event) => setCompany(event.target.value)} /></label><label className="form-field"><span>Role</span><input value={role} onChange={(event) => setRole(event.target.value)} /></label><button className="button secondary wide" onClick={confirmSubmitted} disabled={busy || trackedApplication?.status === 'submitted'}>{trackedApplication?.status === 'submitted' ? 'Already saved as submitted' : trackedApplication ? 'Mark this application submitted' : 'I submitted this application'}</button></section>}
     <section className="panel-section recent-applications"><div className="panel-section-heading"><h2>Recent applications</h2><a href="dashboard.html" target="_blank">View all</a></div>{applications.length === 0 ? <p className="empty-state">Your confirmed applications will appear here.</p> : applications.slice(0, 3).map((application) => <div className="mini-application" key={application.id}><span>{application.role || application.company || 'Application'}</span><i>{application.status.replace('_', ' ')}</i></div>)}</section>
   </main>;

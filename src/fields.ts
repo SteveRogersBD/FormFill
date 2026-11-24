@@ -10,6 +10,7 @@ export interface DetectedField {
   selector: string;
   frameId?: number;
   frameFieldId?: string;
+  description?: string;
 }
 
 type MatchKey = ProfileField | 'firstName' | 'lastName';

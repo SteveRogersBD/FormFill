@@ -7,9 +7,9 @@
 | Extension | Chrome Extensions, Manifest V3 | Browser integration, permissions, messaging |
 | Language | TypeScript | Type-safe extension and profile workflow |
 | UI | React + Vite | Sign-in, resume upload, editable profile dashboard, side panel, review and history |
-| Styling | Tailwind CSS | UI components and layout |
+| Styling | CSS | UI components and layout |
 | Form access | Chrome content scripts + DOM APIs | Detect, inspect and fill application fields on user activation |
-| Workflow | TypeScript state machine | Extract, validate, review, match, fill and track |
+| Workflow | LangGraph.js + LangChain Core runnables | Coordinate saved facts, on-device planning, approved cloud fallback and validation in the side panel |
 | Hybrid AI | Firebase AI Logic Web SDK | On-device and consent-based cloud inference |
 | On-device model | Chrome Prompt API through Firebase AI Logic | Private semantic field matching and grounded drafting on supported Chrome Desktop |
 | Cloud model | Gemini via Firebase AI Logic | Explicitly approved fallback for complex tasks |
@@ -67,7 +67,7 @@ Exact facts such as name, email, phone, university, and graduation date should u
 
 ## Implementation decisions
 
-- No custom backend is required for the initial prototype; use Firebase client SDKs with strict user-scoped rules.
+- The application planner runs in the extension using `src/plannerGraph.ts`, with Firebase inference adapters in `src/plannerModel.ts` and fact/evidence validation in `src/planner.ts`. No custom backend is required for this flow. The Python session API is a separate prototype and is not called by the extension.
 - Build sign-in, PDF upload, profile extraction/review/dashboard, and a controlled test form before expanding platform coverage.
 - Validate Firebase AI Logic on-device support in the actual extension context before depending on it in the AI workflow. Current web hybrid inference requires Firebase JS SDK v12.5.0+ and desktop Chrome 139+ with the Prompt API model available.
 - Verify App Check and Firestore/Storage rules in the target extension deployment before enabling cloud features.

@@ -31,6 +31,12 @@ function optionLabel(element: HTMLInputElement) {
   return cleanLabelText(element.labels?.[0]?.textContent) || element.value;
 }
 
+function descriptionFor(element: HTMLElement) {
+  const ids = element.getAttribute('aria-describedby')?.split(/\s+/) ?? [];
+  const explicit = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+  return cleanLabelText(explicit || element.closest(questionContainer)?.querySelector('.ashby-application-form-question-description')?.textContent).slice(0, 1200);
+}
+
 // A bare "Yes" is the option, not the question, so it must never become the field label.
 const bareOption = /^(yes|no|true|false|male|female|other|none|decline( to (self )?identify)?|i don'?t wish to answer|prefer not to say)$/i;
 
@@ -150,6 +156,7 @@ function scanFields(): DetectedField[] {
     fields.push({
       id,
       label: labelFor(element),
+      description: descriptionFor(element),
       type: groupKey ? 'radio' : element instanceof HTMLInputElement ? element.type : element instanceof HTMLSelectElement ? element.multiple ? 'select-multiple' : 'select' : 'textarea',
       required: members.some((member) => member.required || member.getAttribute('aria-required') === 'true') || Boolean(element.closest(questionContainer)?.querySelector('.ashby-application-form-question-title[class*="_required_"]')),
       options,
@@ -183,6 +190,7 @@ function scanChoiceGroups(startIndex: number): DetectedField[] {
     fields.push({
       id,
       label,
+      description: descriptionFor(group),
       type: 'choice',
       required: group.getAttribute('aria-required') === 'true' || Boolean(group.closest(questionContainer)?.querySelector('[class*="_required_"]')),
       options: buttons.map((button) => cleanLabelText(button.textContent)),
@@ -332,6 +340,7 @@ if (!contentWorld.__applyAiPageListenerInstalled) {
         title,
         url: location.href,
         applicationFrameOrigins: applicationFrameOrigins(),
+        description: cleanLabelText(document.querySelector('.ashby-job-posting-description, #content .content, [data-job-description]')?.textContent).slice(0, 8000),
         ...inferContentPageContext(location.hostname, title, document.querySelector('h1')?.textContent ?? ''),
       } satisfies ApplicationScan);
     }

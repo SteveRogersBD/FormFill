@@ -22,8 +22,14 @@ export async function getFirebaseServices() {
     const app = initializeApp(firebaseConfig);
     if (appCheckSiteKey || appCheckDebug) {
       if (appCheckDebug) (globalThis as typeof globalThis & { FIREBASE_APPCHECK_DEBUG_TOKEN?: boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
-      const { initializeAppCheck, ReCaptchaV3Provider } = await import('firebase/app-check');
-      initializeAppCheck(app, { provider: new ReCaptchaV3Provider(appCheckSiteKey ?? 'debug-only'), isTokenAutoRefreshEnabled: true });
+      const { initializeAppCheck, ReCaptchaV3Provider, CustomProvider } = await import('firebase/app-check');
+      // The SDK exchanges its registered debug token before calling provider.getToken().
+      // ReCaptchaV3Provider still loads a remote script during initialize(), even in
+      // debug mode, and that violates a Manifest V3 extension's script policy.
+      const provider = appCheckDebug
+        ? new CustomProvider({ getToken: async () => { throw new Error('App Check debug mode was not activated. Reload ApplyAI and try again.'); } })
+        : new ReCaptchaV3Provider(appCheckSiteKey!);
+      initializeAppCheck(app, { provider, isTokenAutoRefreshEnabled: true });
     }
     services = { auth: getAuth(app), db: getFirestore(app), storage: getStorage(app) };
   }
