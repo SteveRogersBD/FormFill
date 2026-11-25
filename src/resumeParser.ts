@@ -1,6 +1,6 @@
 import * as pdfjs from 'pdfjs-dist';
 import workerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url';
-import { emptyProfile, type ResumeProfile } from './profile';
+import { emptyProfile, resumeProfileSchema, type ResumeProfile } from './profile';
 
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
@@ -30,7 +30,7 @@ const COUNTRIES: Record<string, string> = {
 };
 
 const DEGREE_PATTERN = /\b(bachelor|master|doctor|ph\.?d|associate|mba|b\.?s\.?c?|m\.?s\.?c?|b\.?a\.?|m\.?a\.?)\b/i;
-const roleVerb = /^(led|built|worked|created|managed|designed|developed|drove|owned|shipped|delivered|launched|partnered|collaborated)\b/i;
+
 
 function cleanLines(text: string) {
   return text.split(/\n+/).map((line) => line.replace(/^[-•*\s]+/, '').trim()).filter(Boolean);
@@ -63,20 +63,6 @@ function parseEducation(lines: string[]) {
   return { degree: parts[degreeIndex], major: parts.filter((_, index) => index !== degreeIndex).join(', ') };
 }
 
-function parseCurrentRole(lines: string[]) {
-  const line = lines.find((candidate) => /\s+at\s+/i.test(candidate)
-    && candidate.length <= 160
-    && !candidate.endsWith('.')
-    && candidate.split(/\s+/).length <= 12
-    && !roleVerb.test(candidate));
-  if (!line) return { currentTitle: '', currentCompany: '' };
-  const [title, ...rest] = line.split(/\s+at\s+/i);
-  return {
-    currentTitle: title.trim(),
-    currentCompany: rest.join(' at ').replace(/\s*[·|]\s*.*$/, '').trim(),
-  };
-}
-
 export function extractProfileFromText(text: string): ResumeProfile {
   if (!text.trim()) throw new Error('This PDF has no selectable text. It may be scanned; OCR is not included yet. Your file is still selected, so you can enter details manually and save it.');
   const lines = cleanLines(text);
@@ -95,6 +81,7 @@ export function extractProfileFromText(text: string): ResumeProfile {
   let activeSection: keyof Pick<ResumeProfile, 'skills' | 'workExperience' | 'projects' | 'achievements'> | undefined;
   let inEducation = false;
   const educationLines: string[] = [];
+  const experienceLines: string[] = [];
   for (const line of lines) {
     const heading = line.toLowerCase().replace(/&/g, 'and').replace(/[:\s]+$/, '').replace(/\s+/g, ' ');
     const section = sections[heading];
@@ -113,7 +100,8 @@ export function extractProfileFromText(text: string): ResumeProfile {
       inEducation = false;
       continue;
     }
-    if (activeSection) profile[activeSection].push(line);
+    if (activeSection === 'workExperience') experienceLines.push(line);
+    else if (activeSection) profile[activeSection].push(line);
     if (inEducation) educationLines.push(line);
   }
   profile.university = educationLines.find((line) => /\b(university|college|institute|polytechnic)\b/i.test(line)) ?? profile.university;
@@ -128,9 +116,10 @@ export function extractProfileFromText(text: string): ResumeProfile {
   const education = parseEducation(educationLines);
   profile.degree = education.degree;
   profile.major = education.major;
-  const currentRole = parseCurrentRole(profile.workExperience);
-  profile.currentTitle = currentRole.currentTitle;
-  profile.currentCompany = currentRole.currentCompany;
+  profile.workExperience = resumeProfileSchema.shape.workExperience.parse(experienceLines);
+  const currentRole = profile.workExperience.find((entry) => entry.jobTitle);
+  profile.currentTitle = currentRole?.jobTitle ?? '';
+  profile.currentCompany = currentRole?.company ?? '';
   return profile;
 }
 
