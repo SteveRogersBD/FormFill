@@ -43,6 +43,37 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 
 describe('AI side panel workflow', () => {
+  it('offers prepared answers without filling an unapproved sensitive answer', async () => {
+    await act(async () => button('Scan and analyze with AI').click());
+    expect(button('Fill reviewed answers').disabled).toBe(true);
+    expect(button('Fill prepared answers').disabled).toBe(false);
+    await act(async () => button('Fill prepared answers').click());
+    const calls = mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS');
+    expect(calls).toHaveLength(1);
+    expect(calls[0][1].values).toEqual({ a: 'Remote' });
+  });
+
+  it('prepares profile facts when standing-answer storage fails', async () => {
+    mocks.preferences.mockRejectedValue({ code: 'permission-denied' });
+    mocks.profile.mockResolvedValue({ ...emptyProfile(), fullName: 'Riley Example', email: 'riley@example.test', updatedAt: 1 });
+    const fields = [{ id: 'name', label: 'Full name', type: 'text', required: true, options: [], selector: '' }, { id: 'essay', label: 'Why interested?', type: 'textarea', required: true, options: [], selector: '' }];
+    mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => message.type === 'APPLYAI_SCAN_FIELDS' ? { ...application, description: '', fields } : { filled: 1, failed: [] });
+    await act(async () => button('Scan and analyze with AI').click());
+    expect(host.textContent).toContain('Profile details are still available');
+    expect(button('Fill prepared answers').disabled).toBe(false);
+    await act(async () => button('Fill prepared answers').click());
+    expect(mocks.message.mock.calls.find((call) => call[1].type === 'APPLYAI_FILL_FIELDS')?.[1].values).toEqual({ name: 'Riley Example' });
+  });
+
+  it('does not reinject every iframe when filling an already-scanned application', async () => {
+    await act(async () => button('Scan and analyze with AI').click());
+    await act(async () => (host.querySelector('.confirm-sensitive input') as HTMLInputElement).click());
+    const inject = vi.fn().mockRejectedValue(new Error('An unrelated iframe cannot be accessed'));
+    (chrome.scripting as any).executeScript = inject;
+    await act(async () => button('Fill reviewed answers').click());
+    expect(inject).not.toHaveBeenCalled();
+    expect(mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS')).toHaveLength(1);
+  });
   it('loads the saved PDF text before generation and stages it with the full JD', async () => {
     mocks.profile.mockResolvedValue({ ...emptyProfile(), resumePath: 'resumes/user/current.pdf', updatedAt: 2 });
     await act(async () => button('Scan and analyze with AI').click());
