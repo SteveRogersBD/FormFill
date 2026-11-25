@@ -1,5 +1,43 @@
 [
   {
+    "id": "workCountries",
+    "label": "Countries where you want to work",
+    "fieldType": "text",
+    "answerFrom": "preferences",
+    "prefKey": "workCountries",
+    "sensitivity": "standard",
+    "patterns": [
+      "\\bcountries\\b.{0,35}\\b(want|like|wish|willing|work)\\b",
+      "\\b(work|employment) countries\\b"
+    ]
+  },
+  {
+    "id": "usCitizen",
+    "label": "Are you a citizen of the United States?",
+    "fieldType": "yesno",
+    "answerFrom": "preferences",
+    "prefKey": "usCitizen",
+    "sensitivity": "consequential",
+    "patterns": [
+      "\\b(us|u s|united states|american) citiz",
+      "\\bcitizen\\b.{0,30}\\b(us|u s|united states|america)\\b"
+    ],
+    "negative": [
+      "\\bsponsor"
+    ]
+  },
+  {
+    "id": "lgbtqIdentity",
+    "label": "Do you identify as LGBTQ+?",
+    "fieldType": "yesno",
+    "answerFrom": "preferences",
+    "prefKey": "lgbtqIdentity",
+    "sensitivity": "eeo",
+    "patterns": [
+      "\\blgbtq?(?:ia)?\\b"
+    ]
+  },
+  {
     "id": "sponsorshipNowOrFuture",
     "label": "Will you now or in the future require employer sponsorship?",
     "fieldType": "yesno",
@@ -10,7 +48,12 @@
       "\\b(now|currently|present)\\b.{0,45}\\b(future|later|eventually)\\b.{0,160}\\b(sponsor\\w*|immigration case)\\b",
       "\\bsponsor\\w*\\b.{0,100}\\b(now|currently|present)\\b.{0,45}\\b(future|later|eventually)\\b"
     ],
-    "negative": ["\\bwithout\\b", "\\bhistory\\b", "\\bmanager\\b", "\\bevent\\b"]
+    "negative": [
+      "\\bwithout\\b",
+      "\\bhistory\\b",
+      "\\bmanager\\b",
+      "\\bevent\\b"
+    ]
   },
   {
     "id": "sponsorshipFuture",
@@ -145,7 +188,7 @@
   },
   {
     "id": "inJobCountry",
-    "label": "Are you currently located in the job’s country?",
+    "label": "Are you currently located in the job\u2019s country?",
     "fieldType": "yesno",
     "answerFrom": "preferences",
     "prefKey": "inJobCountry",
@@ -309,7 +352,7 @@
   },
   {
     "id": "driversLicense",
-    "label": "Do you have a valid driver’s licence?",
+    "label": "Do you have a valid driver\u2019s licence?",
     "fieldType": "yesno",
     "answerFrom": "preferences",
     "prefKey": "driversLicense",
@@ -519,8 +562,7 @@
     "prefKey": "sexualOrientation",
     "sensitivity": "eeo",
     "patterns": [
-      "\\bsexual orientation\\b",
-      "\\blgbt"
+      "\\bsexual orientation\\b"
     ]
   },
   {
