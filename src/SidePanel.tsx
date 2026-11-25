@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { canPlan, needsConfirmation, savedPlan, type PlannerResult } from './planner';
+import { canPlan, fitsControl, needsConfirmation, savedPlan, type PlannerResult } from './planner';
 import type { User } from 'firebase/auth';
 import { findProfileValue, isSensitiveField } from './fields';
 import { getResumeAttachment, getResumeText, listApplications, loadPreferences, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
@@ -115,6 +115,15 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     setOutcomes((current) => { const next = { ...current }; delete next[id]; return next; });
   };
 
+  const changeContext = (key: 'description' | 'resumeText', text: string) => {
+    if (!scan) return;
+    if (key === 'description') setScan({ ...scan, description: text, contextWarning: undefined });
+    else setResumeText(text);
+    setConfirmed({}); setOutcomes({});
+    setValues((current) => Object.fromEntries(Object.entries(current).filter(([id]) => editedFields.current.has(id) || !plan?.entries.some((entry) => entry.fieldId === id && ['ON_DEVICE', 'IN_CLOUD'].includes(entry.source)))));
+    setPlan((current) => current ? { ...current, warnings: ['Context changed. Analyze again to prepare new AI answers. Your edited answers remain fixed.'], entries: current.entries.map((entry) => ['ON_DEVICE', 'IN_CLOUD'].includes(entry.source) && !editedFields.current.has(entry.fieldId) ? { ...entry, value: '', status: 'needs_user', reason: 'Context changed. Analyze again or enter an answer.' } : entry) } : null);
+  };
+
   const analyze = async (application: ApplicationScan, currentProfile: ResumeProfile, currentPreferences: Preferences, fullResumeText: string) => {
     const token = operation.current;
     const uid = user.uid;
@@ -228,6 +237,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
       setValues((current) => Object.fromEntries(result.fields.map((field) => [field.id, editedFields.current.has(field.id) ? current[field.id] ?? '' : field.currentValue || savedAnswer(field.label, currentProfile, currentPreferences)])));
+      await saveWorkspace({ version: 1, uid, tabId: tab.id, scan: result, plan: null, values: Object.fromEntries(result.fields.map((field) => [field.id, editedFields.current.has(field.id) ? values[field.id] ?? '' : field.currentValue || savedAnswer(field.label, currentProfile, currentPreferences)])), confirmed: {}, manualDone: {}, edited: [...editedFields.current], company: result.company, role: result.role, resumeText: fullResumeText, outcomes: {}, updatedAt: Date.now() }).catch(() => setError('Could not save the temporary workspace. Keep this panel open.'));
       const pageType = result.platform === 'greenhouse' ? ' on this Greenhouse application' : '';
       setNotice(result.fields.length ? `Found ${result.fields.length} fields${pageType}. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
       if (result.fields.length) await analyze(result, currentProfile, currentPreferences, fullResumeText);
@@ -267,7 +277,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       for (const [id, value] of Object.entries(values)) {
         const field = scan.fields.find((candidate) => candidate.id === id);
         if (!field || !canPlan(field)
-          || !value.trim() || ((needsConfirmation(field) || plan?.entries.find((entry) => entry.fieldId === id)?.requiresConfirmation) && !confirmed[id])) continue;
+          || !fitsControl(field, value) || ((needsConfirmation(field) || plan?.entries.find((entry) => entry.fieldId === id)?.requiresConfirmation) && !confirmed[id])) continue;
         const frameValues = valuesByFrame.get(field.frameId ?? 0) ?? {};
         frameValues[field.frameFieldId ?? field.id] = value;
         valuesByFrame.set(field.frameId ?? 0, frameValues);
@@ -310,7 +320,12 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid)]);
       const currentProfile = latestProfile ?? emptyProfile(); const currentPreferences = latestPreferences ?? emptyPreferences();
       setProfile(currentProfile); setPreferences(currentPreferences);
-      await analyze({ ...scan, company, role }, currentProfile, currentPreferences, resumeText);
+      let text = resumeText;
+      if (currentProfile.resumePath !== profile.resumePath) {
+        text = currentProfile.resumePath ? await getResumeText(currentProfile.resumePath) : '';
+        setResumeText(text);
+      }
+      await analyze({ ...scan, company, role }, currentProfile, currentPreferences, text);
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not analyze the application. Saved answers are still available.'); }
     finally { setBusy(false); }
