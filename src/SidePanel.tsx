@@ -308,18 +308,24 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       }
       if (resume && resumeField) valuesByFrame.set(resumeField.frameId ?? 0, valuesByFrame.get(resumeField.frameId ?? 0) ?? {});
       if (!valuesByFrame.size) throw new Error('No prepared answer matches a current control. Scan again and review the field explanations.');
-      const results = await Promise.all([...valuesByFrame].map(async ([frameId, frameValues]) => ({ frameId, result:
-        await chrome.tabs.sendMessage(tab.id, {
-          type: 'APPLYAI_FILL_FIELDS',
-          values: frameValues,
-          resume: resumeField && (resumeField.frameId ?? 0) === frameId ? resume : undefined,
-        }, { frameId }) as { filled: number; failed?: string[]; outcomes?: Record<string, 'verified' | 'failed'> } }),
-      ));
+      const results = await Promise.all([...valuesByFrame].map(async ([frameId, frameValues]) => {
+        try {
+          const result = await chrome.tabs.sendMessage(tab.id, {
+            type: 'APPLYAI_FILL_FIELDS', values: frameValues,
+            resume: resumeField && (resumeField.frameId ?? 0) === frameId ? resume : undefined,
+          }, { frameId }) as { filled: number; failed?: string[]; outcomes?: Record<string, 'verified' | 'failed'> };
+          if (!result || typeof result.filled !== 'number') throw new Error('The application script returned no fill result. Refresh the job page and scan again.');
+          return { frameId, result, transportError: '' };
+        } catch (reason) {
+          return { frameId, result: { filled: 0, failed: Object.keys(frameValues), outcomes: Object.fromEntries(Object.keys(frameValues).map((id) => [id, 'failed' as const])) }, transportError: reason instanceof Error ? reason.message : 'Could not send answers to an application frame.' };
+        }
+      }));
       const filledCount = results.reduce((total, { result }) => total + result.filled, 0);
       setFilled(filledCount > 0);
       setOutcomes(Object.fromEntries([...prepared.skipped.map(({ fieldId }) => [fieldId, 'skipped'] as const), ...results.flatMap(({ frameId, result }) => Object.entries(result.outcomes ?? {}).map(([id, status]) => [originalIds.get(`frame-${frameId}-${id}`) ?? `frame-${frameId}-${id}`, status]))]));
       const failedCount = results.reduce((total, { result }) => total + (result.failed?.length ?? 0), 0);
-      if (failedCount || prepared.skipped.length || resumeError) setError([resumeError, failedCount ? `${failedCount} control(s) could not be verified. Review the field results below.` : '', prepared.skipped.length ? `${prepared.skipped.length} answer(s) were skipped because they need approval or their controls changed. Other prepared answers were still attempted.` : ''].filter(Boolean).join(' '));
+      const transportErrors = results.map(({ transportError }) => transportError).filter(Boolean);
+      if (failedCount || prepared.skipped.length || resumeError || transportErrors.length) setError([resumeError, ...transportErrors, failedCount ? `${failedCount} control(s) could not be verified. Review the field results below.` : '', prepared.skipped.length ? `${prepared.skipped.length} answer(s) were skipped because they need approval or their controls changed. Other prepared answers were still attempted.` : ''].filter(Boolean).join(' '));
       setNotice(filledCount ? `Verified ${filledCount} field${filledCount === 1 ? '' : 's'}. Check the application before continuing.` : 'No answers could be verified. Review the field results below.');
       const after = await rescanApplicationFrames(tab.id, before);
       if (fingerprint(after) !== fingerprint(before)) {
