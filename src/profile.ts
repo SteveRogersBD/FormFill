@@ -106,6 +106,14 @@ export const PROFILE_FIELDS: { key: ProfileField; label: string; multiline?: boo
   { key: 'achievements', label: 'Achievements', list: true, multiline: true },
 ];
 
+export const PROFILE_SECTIONS = [
+  { id: 'personal', title: 'Personal', fields: ['fullName', 'email', 'phone', 'streetAddress', 'city', 'state', 'postalCode', 'country', 'linkedin', 'portfolio', 'targetRole', 'currentTitle', 'currentCompany'] },
+  { id: 'education', title: 'Education', fields: ['university', 'degree', 'major', 'graduationDate', 'gpa'] },
+  { id: 'experience', title: 'Work Experience', fields: ['workExperience'] },
+  { id: 'skills', title: 'Skills', fields: ['skills', 'projects', 'achievements'] },
+  { id: 'employment', title: 'Equal Employment', fields: [] },
+] satisfies { id: string; title: string; fields: ProfileField[] }[];
+
 export function emptyProfile(): ResumeProfile {
   return {
     fullName: '',
