@@ -32,6 +32,39 @@ async function renderDashboard() {
 }
 
 describe('dashboard work eligibility answers', () => {
+  it('adds and saves separate experience records without losing descriptions', async () => {
+    mocks.loadProfile.mockResolvedValue(resumeProfileSchema.parse({ workExperience: ['Engineer at Northstar', 'Built the original platform.'] }));
+    const { host, root } = await renderDashboard();
+    try {
+      await act(async () => (host.querySelector('[aria-label="Edit Work Experience"]') as HTMLButtonElement).click());
+      const add = [...host.querySelectorAll('button')].find((button) => button.textContent === '＋ Add work experience')!;
+      await act(async () => add.click());
+      const roles = host.querySelectorAll('.experience-editor-entry');
+      expect(roles).toHaveLength(2);
+      const inputs = roles[1].querySelectorAll('input');
+      await act(async () => {
+        inputs[0].value = 'Research Assistant'; Simulate.change(inputs[0]);
+        inputs[1].value = 'Example Lab'; Simulate.change(inputs[1]);
+        inputs[2].value = 'Chicago'; Simulate.change(inputs[2]);
+      });
+      const type = roles[1].querySelector('select')!;
+      await act(async () => { type.value = 'Internship'; Simulate.change(type); });
+      const dates = roles[1].querySelectorAll<HTMLInputElement>('input[type="month"]');
+      await act(async () => { dates[0].value = '2024-06'; Simulate.change(dates[0]); });
+      await act(async () => { dates[1].value = '2024-08'; Simulate.change(dates[1]); });
+      const bulletButton = [...roles[1].querySelectorAll('button')].find((button) => button.textContent === '＋ Bullet point')!;
+      await act(async () => bulletButton.click());
+      const bullet = roles[1].querySelector<HTMLTextAreaElement>('.description-bullet textarea')!;
+      await act(async () => { bullet.value = 'Designed an experiment.'; Simulate.change(bullet); });
+      await act(async () => Simulate.submit(host.querySelector('form')!));
+      const saved = mocks.saveProfile.mock.calls[0][0];
+      expect(saved.workExperience).toHaveLength(2);
+      expect(saved.workExperience[0]).toMatchObject({ company: 'Northstar', description: ['Built the original platform.'] });
+      expect(saved.workExperience[1]).toMatchObject({ jobTitle: 'Research Assistant', company: 'Example Lab', location: 'Chicago', jobType: 'Internship', startDate: '2024-06', endDate: '2024-08', description: ['Designed an experiment.'] });
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+      expect(host.querySelector('#experience')!.textContent).toContain('Designed an experiment.');
+    } finally { await act(async () => root.unmount()); host.remove(); }
+  });
   it('loads old profiles without guessing a combined answer, then saves the two requested answers', async () => {
     mocks.save.mockImplementation(async (answers) => ({ ...answers, updatedAt: 1 }));
     const { host, root } = await renderDashboard();
