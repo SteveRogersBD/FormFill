@@ -53,3 +53,15 @@ export function clearWorkspace(uid: string): Promise<void> {
   writes = clearing;
   return clearing;
 }
+
+export function applicationReadiness(scan: ApplicationScan, plan: PlannerResult | null, values: Record<string, string>, confirmed: Record<string, boolean>, manualDone: Record<string, boolean>, hasResume = false) {
+  return scan.fields.map((field) => {
+    const entry = plan?.entries.find((item) => item.fieldId === field.id);
+    const manual = !canPlan(field);
+    const valid = manual
+      ? Boolean(manualDone[field.id] || field.currentValue || (hasResume && field.type === 'file' && /\b(resume|cv|curriculum)\b/i.test(field.label)))
+      : Boolean(fitsControl(field, values[field.id] ?? ''));
+    const approved = manual || !(needsConfirmation(field) || entry?.requiresConfirmation) || Boolean(confirmed[field.id]);
+    return { fieldId: field.id, ready: valid && approved, blocking: field.required && (!valid || !approved), status: !valid ? manual ? 'Complete on page' : 'Missing or invalid answer' : !approved ? 'Awaiting your approval' : 'Prepared' };
+  });
+}
