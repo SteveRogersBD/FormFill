@@ -239,7 +239,7 @@ async function scoutCustomOptions() {
   for (const element of document.querySelectorAll<HTMLElement>('[role="combobox"], [aria-autocomplete], button[aria-haspopup="listbox"]')) {
     if (element.matches(':disabled, [aria-disabled="true"]') || element.closest('[hidden], [aria-hidden="true"]') || (element instanceof HTMLButtonElement && element.form && element.type !== 'button')) continue;
     const wasOpen = element.getAttribute('aria-expanded') === 'true';
-    element.click();
+    if (!wasOpen) element.click();
     const controlledId = element.getAttribute('aria-controls') || element.getAttribute('aria-owns');
     let options: HTMLElement[] = [];
     for (let attempt = 0; attempt < 4; attempt++) {
@@ -252,6 +252,7 @@ async function scoutCustomOptions() {
     element.setAttribute('data-applyai-current', cleanLabelText(options.find((option) => option.getAttribute('aria-selected') === 'true')?.textContent));
     if (!wasOpen) {
       element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      if (element.getAttribute('aria-expanded') === 'true') element.click();
       element.blur();
     }
   }
