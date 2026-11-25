@@ -254,13 +254,20 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     if (!scan) return;
     setBusy(true); setError('');
     try {
+      if (applicationReadiness(scan, plan, values, confirmed, manualDone, Boolean(profile.resumePath)).some((item) => item.blocking)) throw new Error('Complete and approve all required answers before filling. For manual controls, complete them on the page and mark them done below.');
       const tab = await getActiveApplicationTab();
-      if (tab.url !== scan.url) throw new Error('The active application page changed. Scan it again before filling.');
+      if (tab.url !== scan.url || tab.id !== scan.tabId) throw new Error('The active application tab changed. Return to the scanned tab or scan again before filling.');
+      const fingerprint = (application: ApplicationScan) => JSON.stringify(application.fields.map(({ id, label, type, required, options, maxLength, min, max, pattern }) => ({ id, label, type, required, options: ['select', 'radio', 'choice'].includes(type) ? [...options].sort() : [], maxLength, min, max, pattern })));
+      const before = await scanActivePage(tab.id);
+      if (!('scan' in before) || fingerprint(before.scan) !== fingerprint(scan)) {
+        setStale(true);
+        throw new Error('The application questions or options changed. Scan again to prepare the current form.');
+      }
       const valuesByFrame = new Map<number, Record<string, string>>();
       for (const [id, value] of Object.entries(values)) {
         const field = scan.fields.find((candidate) => candidate.id === id);
-        if (!field || ['file', 'password', 'select-multiple'].includes(field.type)
-          || !value.trim() || ((isSensitiveField(field.label) || plan?.entries.find((entry) => entry.fieldId === id)?.requiresConfirmation) && !confirmed[id])) continue;
+        if (!field || !canPlan(field)
+          || !value.trim() || ((needsConfirmation(field) || plan?.entries.find((entry) => entry.fieldId === id)?.requiresConfirmation) && !confirmed[id])) continue;
         const frameValues = valuesByFrame.get(field.frameId ?? 0) ?? {};
         frameValues[field.frameFieldId ?? field.id] = value;
         valuesByFrame.set(field.frameId ?? 0, frameValues);
@@ -274,18 +281,24 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         catch (reason) { resumeError = reason instanceof Error ? reason.message : 'Could not download your resume.'; }
       }
       if (resume && resumeField) valuesByFrame.set(resumeField.frameId ?? 0, valuesByFrame.get(resumeField.frameId ?? 0) ?? {});
-      const results = await Promise.all([...valuesByFrame].map(async ([frameId, frameValues]) =>
+      const results = await Promise.all([...valuesByFrame].map(async ([frameId, frameValues]) => ({ frameId, result:
         await chrome.tabs.sendMessage(tab.id, {
           type: 'APPLYAI_FILL_FIELDS',
           values: frameValues,
           resume: resumeField && (resumeField.frameId ?? 0) === frameId ? resume : undefined,
-        }, { frameId }) as { filled: number; failed?: string[] },
+        }, { frameId }) as { filled: number; failed?: string[]; outcomes?: Record<string, 'verified' | 'failed'> } }),
       ));
-      const filledCount = results.reduce((total, result) => total + result.filled, 0);
+      const filledCount = results.reduce((total, { result }) => total + result.filled, 0);
       setFilled(filledCount > 0);
-      const failedCount = results.reduce((total, result) => total + (result.failed?.length ?? 0), 0);
+      setOutcomes(Object.fromEntries(results.flatMap(({ frameId, result }) => Object.entries(result.outcomes ?? {}).map(([id, status]) => [`frame-${frameId}-${id}`, status]))));
+      const failedCount = results.reduce((total, { result }) => total + (result.failed?.length ?? 0), 0);
       if (failedCount || resumeError) setError([resumeError, failedCount ? `${failedCount} field(s) could not be filled, including any unmatched location option. Review the page and complete them manually.` : ''].filter(Boolean).join(' '));
-      setNotice(filledCount ? `Filled ${filledCount} field${filledCount === 1 ? '' : 's'}. Check the application before continuing.` : 'Nothing was filled. Add or edit answers with values, then try again.');
+      setNotice(filledCount ? `Verified ${filledCount} field${filledCount === 1 ? '' : 's'}. Check the application before continuing.` : 'No answers could be verified. Review the field results below.');
+      const after = await scanActivePage(tab.id);
+      if (!('scan' in after) || fingerprint(after.scan) !== fingerprint(scan)) {
+        setStale(true);
+        setNotice('Filling revealed new or changed questions. Scan again to prepare the next application snapshot; your edits to matching questions will be kept.');
+      }
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not fill this page. Try scanning it again.'); }
     finally { setBusy(false); }
   };
@@ -294,7 +307,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     if (!scan) return;
     setBusy(true); setError('');
     try {
-      const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid).catch(() => null)]);
+      const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid)]);
       const currentProfile = latestProfile ?? emptyProfile(); const currentPreferences = latestPreferences ?? emptyPreferences();
       setProfile(currentProfile); setPreferences(currentPreferences);
       await analyze({ ...scan, company, role }, currentProfile, currentPreferences, resumeText);
@@ -320,38 +333,43 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   };
 
   const trackedApplication = scan ? applications.find((application) => application.url === scan.url) : undefined;
+  const readiness = scan ? applicationReadiness(scan, plan, values, confirmed, manualDone, Boolean(profile.resumePath)) : [];
+  const blockers = readiness.filter((item) => item.blocking).length;
 
   return <main className="panel-shell">
-    <header className="panel-header"><a className="brand" href="dashboard.html" target="_blank"><span className="brand-mark small">A</span><span>apply<span className="brand-accent">ai</span></span></a><a className="button quiet compact" href="dashboard.html" target="_blank">{profile.updatedAt ? 'Edit profile' : 'Set up profile'}</a><button className="button quiet compact" onClick={onLogout}>Sign out</button></header>
+    <header className="panel-header"><a className="brand" href="dashboard.html" target="_blank"><span className="brand-mark small">A</span><span>apply<span className="brand-accent">ai</span></span></a><a className="button quiet compact" href="dashboard.html" target="_blank">{profile.updatedAt ? 'Edit profile' : 'Set up profile'}</a><button className="button quiet compact" onClick={async () => { await discard(); await onLogout(); }}>Sign out</button></header>
     <section className="panel-intro"><p className="eyebrow">APPLICATION ASSISTANT</p><h1>Let’s fill this out.</h1><p className="muted">Your profile stays yours. You choose what gets filled.</p></section>
     {error && <div className="notice error compact-notice" role="alert">{error}</div>}{notice && <div className="notice success compact-notice" role="status">{notice}</div>}
     {!loading && !profile.updatedAt && <div className="notice info compact-notice">Set up your resume profile before scanning. Use <strong>Set up profile</strong> above, then <button className="text-button" onClick={refreshProfile}>refresh the profile here</button>.</div>}
-    <div className="ai-settings"><label className="cloud-consent"><input type="checkbox" checked={cloudConsent} disabled={busy || !firebaseAppCheckReady} onChange={(event) => setCloudConsent(event.target.checked)} /> Allow cloud fallback for this application. This sends question labels, options, job context, and reviewed profile facts (including contact and location details) to Firebase AI Logic. Standing-answer values stay on this device.</label>
-    <p className="field-hint">On-device AI runs first. Cloud AI is used only for unresolved questions when you approve it.{!firebaseAppCheckReady && ' Cloud fallback needs Firebase App Check configured.'}</p></div>
+    <div className="ai-settings"><label className="cloud-consent"><input type="checkbox" checked={cloudConsent} disabled={busy || !firebaseAppCheckReady} onChange={(event) => setCloudConsent(event.target.checked)} /> Allow cloud AI for this application. This sends all questions and options, the full job description, resume text, reviewed profile (including contact details), and saved answers allowed by your sharing settings to Firebase AI Logic.</label>
+    <p className="field-hint">One generation per analysis. We use the on-device model when it is ready and fits the complete request; otherwise we choose approved cloud AI before generating. No automatic retry after a failed generation.{!firebaseAppCheckReady && ' Cloud AI needs Firebase App Check configured.'}</p></div>
     {plan && <section className="notice info compact-notice" aria-label="AI analysis results">
       <strong>Analysis complete</strong>
       <p className="field-hint">{plan.attempts.length ? `Attempted: ${plan.attempts.map((source) => source === 'ON_DEVICE' ? 'on-device' : 'cloud').join(' → ')}` : 'No AI needed for these controls.'}</p>
       {plan.warnings.map((warning) => <p className="field-hint" key={warning}>{warning}</p>)}
     </section>}
-    <button className="button primary wide scan-button" onClick={scanPage} disabled={loading || busy || !profile.updatedAt}>{busy ? 'Working…' : scan ? 'Scan and analyze again' : 'Scan and analyze with AI'}</button>
+    <button className="button primary wide scan-button" onClick={scanPage} disabled={loading || !restored || busy || !profile.updatedAt}>{busy ? 'Working…' : scan ? 'Scan and analyze again' : 'Scan and analyze with AI'}</button>
+    {scan && <section className="panel-section" aria-label="Temporary application workspace"><div className="panel-section-heading"><h2>Application workspace</h2><button className="text-button" disabled={busy} onClick={() => { void discard().catch(() => setError('Could not discard the saved workspace. Try again.')); }}>Discard</button></div><p className="field-hint">{scan.title} · Answers stay in this browser session until discarded or signed out. Closing the panel keeps your progress.</p><details open={!scan.description || Boolean(scan.contextWarning)}><summary>Job and resume context</summary>{scan.contextWarning && <p className="field-hint">{scan.contextWarning}</p>}<label className="form-field"><span>Full job description</span><textarea rows={8} disabled={busy} value={scan.description ?? ''} onChange={(event) => { setScan({ ...scan, description: event.target.value, contextWarning: undefined }); setConfirmed({}); setValues((current) => Object.fromEntries(Object.entries(current).filter(([id]) => editedFields.current.has(id) || !plan?.entries.some((entry) => entry.fieldId === id && ['ON_DEVICE', 'IN_CLOUD'].includes(entry.source))))); setPlan(null); }} /></label><label className="form-field"><span>Full resume text</span><textarea rows={8} disabled={busy} value={resumeText} onChange={(event) => { setResumeText(event.target.value); setConfirmed({}); setValues((current) => Object.fromEntries(Object.entries(current).filter(([id]) => editedFields.current.has(id) || !plan?.entries.some((entry) => entry.fieldId === id && ['ON_DEVICE', 'IN_CLOUD'].includes(entry.source))))); setPlan(null); }} /></label><p className="field-hint">Check extracted text before analysis. Reviewed profile facts take precedence over older resume text. If no PDF is saved, the structured profile supplies career evidence.</p></details><p role="status">{stale ? 'Questions changed — scan again.' : blockers ? `${blockers} required question${blockers === 1 ? '' : 's'} need an answer or approval.` : 'All required answers are prepared. Ready to fill.'}</p></section>}
     {siteAccessRequest && <section className="panel-section site-access-card"><p className="field-hint">ApplyAI needs permission to read this application page on <strong>{siteAccessRequest.hostname}</strong>.</p><button className="button secondary wide" onClick={grantSiteAccess} disabled={busy}>Allow access to {siteAccessRequest.hostname}</button><p className="field-hint">Chrome will ask you to approve access to this site only.</p></section>}
     {suggestions.length > 0 && <section className="panel-section"><div className="panel-section-heading"><h2>Review answers</h2><span>{suggestions.length} fields</span></div>{inferenceSource && <div className="inference-badge">✦ {inferenceSource}</div>}<div className="answer-list">{suggestions.map(({ field, suggested }) => {
       const planned = plan?.entries.find((entry) => entry.fieldId === field.id);
-      const sensitive = isSensitiveField(field.label) || planned?.requiresConfirmation;
-      const unsupported = ['file', 'password', 'select-multiple'].includes(field.type);
+      const sensitive = needsConfirmation(field) || planned?.requiresConfirmation;
+      const unsupported = !canPlan(field);
       return <div className="answer-row" key={field.id}><label className="answer-label" htmlFor={`answer-${field.id}`}>{field.label || 'Unlabeled field'}{field.required && <i>Required</i>}</label>
-        {['radio', 'select', 'choice'].includes(field.type) && field.options.length > 0 ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => editAnswer(field.id, event.target.value)}><option value="">Choose an option</option>{field.options.map((option) => <option key={option}>{option}</option>)}</select>
-          : field.type === 'checkbox' ? <select id={`answer-${field.id}`} value={values[field.id] ?? ''} onChange={(event) => editAnswer(field.id, event.target.value)}><option value="">Leave unchanged</option><option value="true">Check this box</option></select>
+        {field.description && <p className="field-hint">{field.description}</p>}<p className="field-hint">{outcomes[field.id] === 'verified' ? 'Filled and verified' : outcomes[field.id] === 'failed' ? 'Could not verify on the page — review this control' : readiness.find((item) => item.fieldId === field.id)?.status}</p>
+        {['radio', 'select', 'select-one', 'choice'].includes(field.type) && field.options.length > 0 ? <select id={`answer-${field.id}`} disabled={busy} value={values[field.id] ?? ''} onChange={(event) => editAnswer(field.id, event.target.value)}><option value="">Choose an option</option>{field.options.map((option) => <option key={option}>{option}</option>)}</select>
+          : field.type === 'checkbox' ? <select id={`answer-${field.id}`} disabled={busy} value={values[field.id] ?? ''} onChange={(event) => editAnswer(field.id, event.target.value)}><option value="">Leave unchanged</option><option value="true">Check this box</option><option value="false">Leave unchecked</option></select>
           : field.type === 'textarea' ? <textarea id={`answer-${field.id}`} rows={4} value={values[field.id] ?? ''} disabled={unsupported} onChange={(event) => editAnswer(field.id, event.target.value)} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />
-          : <input id={`answer-${field.id}`} value={values[field.id] ?? ''} disabled={unsupported} onChange={(event) => editAnswer(field.id, event.target.value)} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />}
+          : <input id={`answer-${field.id}`} value={values[field.id] ?? ''} disabled={unsupported || busy} onChange={(event) => editAnswer(field.id, event.target.value)} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />}
         {planned && <p className="field-hint">{editedFields.current.has(field.id) ? 'Edited by you.' : planned.reason}{planned.evidence.length > 0 && !editedFields.current.has(field.id) ? ` Source: ${planned.evidence.map(evidenceLabel).join(', ')}` : ''}</p>}
-        {sensitive && <label className="confirm-sensitive"><input type="checkbox" checked={Boolean(confirmed[field.id])} onChange={(event) => setConfirmed((current) => ({ ...current, [field.id]: event.target.checked }))} /> I reviewed and approve this answer.</label>}
+        {sensitive && !unsupported && <label className="confirm-sensitive"><input type="checkbox" disabled={busy || !values[field.id]} checked={Boolean(confirmed[field.id])} onChange={(event) => setConfirmed((current) => ({ ...current, [field.id]: event.target.checked }))} /> I reviewed and approve this answer.</label>}
+        {unsupported && <label className="confirm-sensitive"><input type="checkbox" disabled={busy} checked={Boolean(manualDone[field.id])} onChange={(event) => setManualDone((current) => ({ ...current, [field.id]: event.target.checked }))} /> I completed this control on the application page.</label>}
         {unsupported && <span className="field-hint">{field.type === 'file'
           ? /\b(resume|cv|curriculum)\b/i.test(field.label) ? profile.resumePath ? 'ApplyAI will try to attach your saved resume when you fill.' : 'Upload a resume in your profile to attach it automatically.' : 'Attach this file manually on the application page.'
           : 'This field type needs your attention on the page.'}</span>}
         {!suggested && !values[field.id] && !unsupported && <span className="field-hint">Add a missing fact in your <a href="dashboard.html" target="_blank">profile or standing answers ↗</a>, or type an answer here.</span>}
       </div>;
-    })}</div><button className="button secondary wide ai-button" onClick={reanalyze} disabled={busy}>Analyze answers again</button><button className="button primary wide fill-button" onClick={fillPage} disabled={busy}>{busy ? 'Working…' : 'Fill reviewed answers'}</button><p className="fine-print center">ApplyAI never submits the application for you.</p></section>}
+    })}</div><button className="button secondary wide ai-button" onClick={reanalyze} disabled={busy || stale}>Analyze answers again</button><p className="field-hint">Analyzing again explicitly starts a new batch request. Your edited answers stay fixed.</p><button className="button primary wide fill-button" onClick={fillPage} disabled={busy || stale || blockers > 0}>{busy ? 'Working…' : 'Fill reviewed answers'}</button><p className="fine-print center">ApplyAI never submits the application for you.</p></section>}
     {scan && <section className="confirm-card"><p className="eyebrow">{filled ? 'AFTER YOU SUBMIT' : 'APPLICATION TRACKING'}</p><h2>{filled ? 'Applied? Save it here.' : 'Submitted this application?'}</h2><label className="form-field"><span>Company</span><input value={company} onChange={(event) => setCompany(event.target.value)} /></label><label className="form-field"><span>Role</span><input value={role} onChange={(event) => setRole(event.target.value)} /></label><button className="button secondary wide" onClick={confirmSubmitted} disabled={busy || trackedApplication?.status === 'submitted'}>{trackedApplication?.status === 'submitted' ? 'Already saved as submitted' : trackedApplication ? 'Mark this application submitted' : 'I submitted this application'}</button></section>}
     <section className="panel-section recent-applications"><div className="panel-section-heading"><h2>Recent applications</h2><a href="dashboard.html" target="_blank">View all</a></div>{applications.length === 0 ? <p className="empty-state">Your confirmed applications will appear here.</p> : applications.slice(0, 3).map((application) => <div className="mini-application" key={application.id}><span>{application.role || application.company || 'Application'}</span><i>{application.status.replace('_', ' ')}</i></div>)}</section>
   </main>;
