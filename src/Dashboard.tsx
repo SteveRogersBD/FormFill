@@ -26,6 +26,13 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
   const [editorError, setEditorError] = useState('');
   const [activeSection, setActiveSection] = useState('personal');
 
+  const openEditor = (section: string) => {
+    if (!loaded || working) return;
+    setDraftProfile(resumeProfileSchema.parse(profile));
+    setDraftPreferences(preferencesSchema.parse(preferences));
+    setEditorError(''); setEditing(section);
+  };
+
   useEffect(() => {
     Promise.all([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid)]).then(([savedProfile, records, savedPreferences]) => {
       setProfile(savedProfile ?? emptyProfile());
