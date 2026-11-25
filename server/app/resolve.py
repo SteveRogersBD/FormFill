@@ -80,7 +80,7 @@ def _read_profile(profile: Mapping[str, Any], key: str) -> str:
             return parts[0] if parts else ""
         return parts[-1] if len(parts) > 1 else ""
     stored = profile.get(key)
-    text = ", ".join(str(item) for item in stored) if isinstance(stored, list) else str(stored or "")
+    text = ", ".join(_experience_text(item) if key == "workExperience" else str(item) for item in stored) if isinstance(stored, list) else str(stored or "")
     text = text.strip()
     if key in {"linkedin", "portfolio"} and text and not text.lower().startswith(("http://", "https://")):
         text = f"https://{text}"
