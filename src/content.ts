@@ -136,7 +136,7 @@ function scanFields(): DetectedField[] {
   const elements = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')]
     .filter((element) => {
       const label = labelFor(element).toLowerCase();
-      return !element.disabled && element.type !== 'hidden' && element.type !== 'submit' && element.type !== 'button' && element.type !== 'reset'
+      return !element.disabled && !element.closest('[hidden], [aria-hidden="true"]') && element.type !== 'hidden' && element.type !== 'submit' && element.type !== 'button' && element.type !== 'reset'
         && !element.closest('.ashby-application-form-autofill-input-root, .ashby-application-form-input-yesno, .grecaptcha-badge')
         && !/\b(search|newsletter|job alert|subscribe)\b/.test(label);
     });
@@ -151,8 +151,9 @@ function scanFields(): DetectedField[] {
   for (const element of elements) {
     const groupKey = element instanceof HTMLInputElement && element.type === 'radio' && element.name ? element.name : '';
     if (groupKey && handledGroups.has(groupKey)) continue;
-    const index = fields.length;
-    const id = `applyai-${index}`;
+    const label = labelFor(element);
+    const occurrence = fields.filter((field) => field.label === label).length;
+    const id = stableFieldId(label, element.id || element.name || element.type, occurrence);
     const members = groupKey ? radioGroups.get(groupKey) ?? [element] : [element];
     members.forEach((member) => member.setAttribute('data-applyai-field', id));
     if (groupKey) handledGroups.add(groupKey);
@@ -161,13 +162,27 @@ function scanFields(): DetectedField[] {
       : groupKey ? members.map((member) => optionLabel(member as HTMLInputElement)).filter(Boolean) : [];
     fields.push({
       id,
-      label: labelFor(element),
+      label,
       description: descriptionFor(element),
       type: groupKey ? 'radio' : element instanceof HTMLInputElement ? element.type : element instanceof HTMLSelectElement ? element.multiple ? 'select-multiple' : 'select' : 'textarea',
       required: members.some((member) => member.required || member.getAttribute('aria-required') === 'true') || Boolean(element.closest(questionContainer)?.querySelector('.ashby-application-form-question-title[class*="_required_"]')),
-      options,
+      options: options.length ? options : JSON.parse(element.getAttribute('data-applyai-options') || '[]'),
+      section: cleanLabelText(element.closest('fieldset, section')?.querySelector('legend, h2, h3')?.textContent),
+      currentValue: element instanceof HTMLInputElement && element.type === 'radio' ? (members.find((member) => (member as HTMLInputElement).checked) ? optionLabel(members.find((member) => (member as HTMLInputElement).checked) as HTMLInputElement) : '') : element instanceof HTMLSelectElement ? element.selectedOptions[0]?.value ? element.selectedOptions[0].text : '' : element instanceof HTMLInputElement && element.type === 'checkbox' ? element.checked ? 'true' : '' : element.value,
+      maxLength: element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement ? element.maxLength >= 0 ? element.maxLength : undefined : undefined,
+      min: element.getAttribute('min') || undefined,
+      max: element.getAttribute('max') || undefined,
+      pattern: element.getAttribute('pattern') || undefined,
       selector: `[data-applyai-field="${id}"]`,
     });
+  }
+  for (const element of document.querySelectorAll<HTMLElement>('[role="combobox"]:not(input):not(select):not(textarea), button[aria-haspopup="listbox"]')) {
+    if (element.matches(':disabled, [aria-disabled="true"]') || element.closest('[hidden], [aria-hidden="true"]') || (element instanceof HTMLButtonElement && element.form && element.type !== 'button')) continue;
+    const label = questionTitle(element) || cleanLabelText(element.getAttribute('aria-label')) || cleanLabelText(element.getAttribute('aria-labelledby')?.split(/\s+/).map((id) => document.getElementById(id)?.textContent).join(' '));
+    if (!label) continue;
+    const id = stableFieldId(label, element.id || 'combobox', fields.filter((field) => field.label === label).length);
+    element.setAttribute('data-applyai-field', id);
+    fields.push({ id, label, type: 'select', required: element.getAttribute('aria-required') === 'true', description: descriptionFor(element), options: JSON.parse(element.getAttribute('data-applyai-options') || '[]'), selector: `[data-applyai-field="${id}"]`, currentValue: element.getAttribute('data-applyai-current') || '' });
   }
   return [...fields, ...scanChoiceGroups(fields.length)];
 }
@@ -185,13 +200,13 @@ function scanChoiceGroups(startIndex: number): DetectedField[] {
         const text = cleanLabelText(button.textContent);
         return text.length > 0 && text.length <= 30;
       });
-    if (buttons.length < 2 || buttons.length > 6) continue;
+    if (buttons.length < 2 || buttons.length > 200) continue;
     const label = questionTitle(group) || cleanLabelText(group.getAttribute('aria-label'))
       || cleanLabelText(group.querySelector('legend')?.textContent)
       || cleanLabelText(group.previousElementSibling?.textContent)
       || cleanLabelText(group.parentElement?.querySelector('label, legend, h3, p')?.textContent);
     if (!label) continue;
-    const id = `applyai-${startIndex + fields.length}`;
+    const id = stableFieldId(label, 'choice', fields.filter((field) => field.label === label).length);
     buttons.forEach((button) => button.setAttribute('data-applyai-field', id));
     fields.push({
       id,
@@ -200,6 +215,7 @@ function scanChoiceGroups(startIndex: number): DetectedField[] {
       type: 'choice',
       required: group.getAttribute('aria-required') === 'true' || Boolean(group.closest(questionContainer)?.querySelector('[class*="_required_"]')),
       options: buttons.map((button) => cleanLabelText(button.textContent)),
+      currentValue: cleanLabelText(buttons.find((button) => button.getAttribute('aria-pressed') === 'true' || button.getAttribute('aria-checked') === 'true')?.textContent),
       selector: `[data-applyai-field="${id}"]`,
     });
   }
