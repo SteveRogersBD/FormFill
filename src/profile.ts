@@ -37,6 +37,16 @@ export function normalizeWorkExperience(value: unknown): unknown {
   return entries;
 }
 
+export function formatWorkExperience(entries: WorkExperience[]): string[] {
+  return entries.map((entry) => [
+    [entry.jobTitle, entry.company].filter(Boolean).join(' at '),
+    [entry.jobType, entry.location].filter(Boolean).join(' · '),
+    [entry.startDate, entry.current ? 'Present' : entry.endDate].filter(Boolean).join(' – '),
+    entry.summary,
+    ...entry.description,
+  ].filter(Boolean).join('\n')).filter(Boolean);
+}
+
 export const resumeProfileSchema = z.object({
   fullName: z.string().max(200).default(''),
   email: z.string().max(320).default(''),
