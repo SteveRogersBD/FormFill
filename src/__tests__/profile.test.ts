@@ -2,6 +2,12 @@ import { describe, expect, it } from 'vitest';
 import { emptyProfile, formatWorkExperience, resumeProfileSchema, workExperienceSchema } from '../profile';
 
 describe('resumeProfileSchema', () => {
+  it('rejects invalid months reversed dates and contradictory current roles', () => {
+    expect(workExperienceSchema.safeParse({ id: '1', startDate: '2024-13' }).success).toBe(false);
+    expect(workExperienceSchema.safeParse({ id: '1', startDate: '2025-01', endDate: '2024-12' }).success).toBe(false);
+    expect(workExperienceSchema.safeParse({ id: '1', current: true, endDate: '2024-12' }).success).toBe(false);
+    expect(workExperienceSchema.safeParse({ id: '1', current: true, startDate: '2024-12' }).success).toBe(true);
+  });
   it('round-trips structured roles with dates location summary and bullets', () => {
     const entry = workExperienceSchema.parse({ id: 'role-1', jobTitle: 'Engineer', company: 'Northstar', jobType: 'Internship', location: 'Chicago, IL', startDate: '2024-06', endDate: '2024-08', summary: 'Platform engineering.', description: ['Built APIs.', 'Improved reliability.'] });
     expect(resumeProfileSchema.parse({ workExperience: [entry] }).workExperience).toEqual([entry]);
