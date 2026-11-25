@@ -27,3 +27,12 @@ const workspaceSchema = z.object({
   values: z.record(z.string(), z.string()), confirmed: z.record(z.string(), z.boolean()), manualDone: z.record(z.string(), z.boolean()), edited: z.array(z.string()), company: z.string(), role: z.string(), resumeText: z.string(), outcomes: z.record(z.string(), z.enum(['verified', 'failed'])),
 });
 let writes: Promise<unknown> = Promise.resolve();
+
+export function saveWorkspace(workspace: ApplicationWorkspace): Promise<void> {
+  const snapshot = workspaceSchema.parse(workspace);
+  const saving = writes.catch(() => undefined).then(async () => {
+    await chrome.storage.session.set({ [`applyAiWorkspace:${snapshot.uid}`]: snapshot });
+  });
+  writes = saving;
+  return saving;
+}
