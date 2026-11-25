@@ -31,7 +31,7 @@
     { "pattern": "\\b(full|preferred|legal|your) name\\b", "key": "fullName" },
     { "pattern": "\\bname\\b", "key": "fullName", "guard": "notAnApplicantName" }
   ],
-  "sensitivePattern": "salary|compensation|sponsor|visa|work authorization|authorized to work|citizenship|citizen|background check|security clearance|relocat|criminal|disability|medical|health|veteran|military|gender|pronoun|race|ethnicity|sexual orientation|consent|certify|attest|acknowledge|arbitration|terms and conditions",
+  "sensitivePattern": "salary|compensation|sponsor|visa|work authorization|authorized to work|citizenship|citizen|background check|security clearance|relocat|criminal|disability|medical|health|veteran|military|gender|pronoun|race|ethnicity|sexual orientation|lgbtq?|consent|certify|attest|acknowledge|arbitration|terms and conditions",
   "coverLetterPattern": "\\bcover letter\\b|\\bletter of (?:interest|motivation)\\b|\\bstatement of interest\\b",
   "preferenceAnswers": {
     "yes": "Yes",
