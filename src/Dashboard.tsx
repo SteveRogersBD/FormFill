@@ -56,11 +56,11 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
   const updateField = (key: ProfileField, rawValue: string) => {
     const field = PROFILE_FIELDS.find((item) => item.key === key);
     const value = field?.list ? rawValue.split(field.key === 'skills' ? /\n|,/ : /\n/).map((item) => item.trim()).filter(Boolean) : rawValue;
-    setProfile((current) => ({ ...current, [key]: value }));
+    setDraftProfile((current) => ({ ...current, [key]: value }));
   };
 
   const updatePreference = <K extends AnswerKey>(key: K, value: Preferences[K]) => {
-    setPreferences((current) => ({ ...current, [key]: value }));
+    setDraftPreferences((current) => ({ ...current, [key]: value }));
   };
 
   const saveStandingAnswers = async () => {
