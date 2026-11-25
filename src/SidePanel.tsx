@@ -243,7 +243,8 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
       setValues((current) => Object.fromEntries(result.fields.map((field) => [field.id, editedFields.current.has(field.id) ? current[field.id] ?? '' : field.currentValue || savedAnswer(field.label, currentProfile, currentPreferences)])));
-      await saveWorkspace({ version: 1, uid, tabId: tab.id, scan: result, plan: null, values: Object.fromEntries(result.fields.map((field) => [field.id, editedFields.current.has(field.id) ? values[field.id] ?? '' : field.currentValue || savedAnswer(field.label, currentProfile, currentPreferences)])), confirmed: {}, manualDone: {}, edited: [...editedFields.current], company: result.company, role: result.role, resumeText: fullResumeText, outcomes: {}, updatedAt: Date.now() }).catch(() => setError('Could not save the temporary workspace. Keep this panel open.'));
+      await saveWorkspace({ version: 1, uid, tabId: tab.id, scan: result, plan: null, values: Object.fromEntries(result.fields.map((field) => [field.id, editedFields.current.has(field.id) ? values[field.id] ?? '' : field.currentValue || savedAnswer(field.label, currentProfile, currentPreferences)])), confirmed: {}, manualDone: {}, edited: [...editedFields.current], company: result.company, role: result.role, resumeText: fullResumeText, resumePath: currentProfile.resumePath, outcomes: {}, updatedAt: Date.now() }).catch(() => setError('Could not save the temporary workspace. Keep this panel open.'));
+      if (token !== operation.current || owner.current !== uid) return;
       const pageType = result.platform === 'greenhouse' ? ' on this Greenhouse application' : '';
       setNotice(result.fields.length ? `Found ${result.fields.length} fields${pageType}. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
       if (result.fields.length) await analyze(result, currentProfile, currentPreferences, fullResumeText);
@@ -321,9 +322,12 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
 
   const reanalyze = async () => {
     if (!scan) return;
+    const uid = user.uid;
+    const token = ++operation.current;
     setBusy(true); setError('');
     try {
       const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid)]);
+      if (token !== operation.current || owner.current !== uid) return;
       const currentProfile = latestProfile ?? emptyProfile(); const currentPreferences = latestPreferences ?? emptyPreferences();
       setProfile(currentProfile); setPreferences(currentPreferences);
       let text = resumeText;
@@ -331,6 +335,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         text = currentProfile.resumePath ? await getResumeText(currentProfile.resumePath) : '';
         setResumeText(text); resumeSource.current = currentProfile.resumePath;
       }
+      if (token !== operation.current || owner.current !== uid) return;
       await analyze({ ...scan, company, role }, currentProfile, currentPreferences, text);
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not analyze the application. Saved answers are still available.'); }
