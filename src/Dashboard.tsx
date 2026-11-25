@@ -1,8 +1,14 @@
-import { useEffect, useState, type ChangeEvent } from 'react';
+import { useEffect, useState, type ChangeEvent, type FormEvent } from 'react';
 import type { User } from 'firebase/auth';
 import { deleteApplication, getResumeUrl, listApplications, loadPreferences, loadProfile, savePreferences, saveProfile, saveResume, updateApplication, type ApplicationRecord } from './data';
-import { emptyProfile, PROFILE_FIELDS, type ProfileField, type ResumeProfile } from './profile';
-import { emptyPreferences, PREFERENCE_FIELDS, PREFERENCE_GROUPS, type AnswerKey, type Preferences } from './preferences';
+import { emptyProfile, PROFILE_FIELDS, PROFILE_SECTIONS, resumeProfileSchema, type ProfileField, type ResumeProfile } from './profile';
+import { emptyPreferences, EMPLOYMENT_OVERVIEW_KEYS, PREFERENCE_FIELDS, PREFERENCE_GROUPS, preferenceAnswer, preferencesSchema, type AnswerKey, type Preferences } from './preferences';
+import { ProfileSection } from './ProfileSection';
+import { ProfileEditor } from './ProfileEditor';
+import { ProfileFieldsEditor } from './ProfileFieldsEditor';
+import { WorkExperienceEditor } from './WorkExperienceEditor';
+import { ExperienceTimeline } from './ExperienceTimeline';
+import { findProfileValue } from './fields';
 
 export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Promise<void> }) {
   const [profile, setProfile] = useState<ResumeProfile>(emptyProfile());
@@ -13,12 +19,19 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draftProfile, setDraftProfile] = useState<ResumeProfile>(emptyProfile());
+  const [draftPreferences, setDraftPreferences] = useState<Preferences>(emptyPreferences());
+  const [editorError, setEditorError] = useState('');
+  const [activeSection, setActiveSection] = useState('personal');
 
   useEffect(() => {
-    Promise.all([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid).catch(() => null)]).then(([savedProfile, records, savedPreferences]) => {
+    Promise.all([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid)]).then(([savedProfile, records, savedPreferences]) => {
       setProfile(savedProfile ?? emptyProfile());
       setApplications(records);
       setPreferences(savedPreferences ?? emptyPreferences());
+      setLoaded(true);
     }).catch((reason) => setError(reason instanceof Error ? reason.message : 'Could not load your profile.')).finally(() => setLoading(false));
   }, [user.uid]);
 
