@@ -81,11 +81,9 @@ describe('dashboard work eligibility answers', () => {
       const roles = host.querySelectorAll('.experience-editor-entry');
       expect(roles).toHaveLength(2);
       const inputs = roles[1].querySelectorAll('input');
-      await act(async () => {
-        inputs[0].value = 'Research Assistant'; Simulate.change(inputs[0]);
-        inputs[1].value = 'Example Lab'; Simulate.change(inputs[1]);
-        inputs[2].value = 'Chicago'; Simulate.change(inputs[2]);
-      });
+      await act(async () => { inputs[0].value = 'Research Assistant'; Simulate.change(inputs[0]); });
+      await act(async () => { inputs[1].value = 'Example Lab'; Simulate.change(inputs[1]); });
+      await act(async () => { inputs[2].value = 'Chicago'; Simulate.change(inputs[2]); });
       const type = roles[1].querySelector('select')!;
       await act(async () => { type.value = 'Internship'; Simulate.change(type); });
       const dates = roles[1].querySelectorAll<HTMLInputElement>('input[type="month"]');
