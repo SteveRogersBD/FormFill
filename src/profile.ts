@@ -67,7 +67,7 @@ export const resumeProfileSchema = z.object({
   currentTitle: z.string().max(200).default(''),
   targetRole: z.string().max(200).default(''),
   skills: z.array(z.string().max(200)).max(100).default([]),
-  workExperience: z.preprocess(normalizeWorkExperience, z.array(workExperienceSchema).max(100).default([])),
+  workExperience: z.preprocess(normalizeWorkExperience, z.array(workExperienceSchema).max(100).refine((entries) => new Set(entries.map((entry) => entry.id)).size === entries.length, 'Work experience entries must have unique IDs.').default([])),
   projects: z.array(z.string().max(2000)).max(100).default([]),
   achievements: z.array(z.string().max(1000)).max(100).default([]),
   resumePath: z.string().max(1000).default(''),
