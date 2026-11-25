@@ -111,7 +111,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const [plan, setPlan] = useState<PlannerResult | null>(null);
   const [resumeText, setResumeText] = useState('');
   const [manualDone, setManualDone] = useState<Record<string, boolean>>({});
-  const [outcomes, setOutcomes] = useState<Record<string, 'verified' | 'failed'>>({});
+  const [outcomes, setOutcomes] = useState<Record<string, 'verified' | 'failed' | 'skipped'>>({});
   const [restored, setRestored] = useState(false);
   const [stale, setStale] = useState(false);
   const editedFields = useRef(new Set<string>());
@@ -317,7 +317,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       ));
       const filledCount = results.reduce((total, { result }) => total + result.filled, 0);
       setFilled(filledCount > 0);
-      setOutcomes(Object.fromEntries([...prepared.skipped.map(({ fieldId }) => [fieldId, 'failed'] as const), ...results.flatMap(({ frameId, result }) => Object.entries(result.outcomes ?? {}).map(([id, status]) => [originalIds.get(`frame-${frameId}-${id}`) ?? `frame-${frameId}-${id}`, status]))]));
+      setOutcomes(Object.fromEntries([...prepared.skipped.map(({ fieldId }) => [fieldId, 'skipped'] as const), ...results.flatMap(({ frameId, result }) => Object.entries(result.outcomes ?? {}).map(([id, status]) => [originalIds.get(`frame-${frameId}-${id}`) ?? `frame-${frameId}-${id}`, status]))]));
       const failedCount = results.reduce((total, { result }) => total + (result.failed?.length ?? 0), 0);
       if (failedCount || prepared.skipped.length || resumeError) setError([resumeError, failedCount ? `${failedCount} control(s) could not be verified. Review the field results below.` : '', prepared.skipped.length ? `${prepared.skipped.length} answer(s) were skipped because they need approval or their controls changed. Other prepared answers were still attempted.` : ''].filter(Boolean).join(' '));
       setNotice(filledCount ? `Verified ${filledCount} field${filledCount === 1 ? '' : 's'}. Check the application before continuing.` : 'No answers could be verified. Review the field results below.');
@@ -382,7 +382,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     <p className="field-hint">One generation per analysis. We use the on-device model when it is ready and fits the complete request; otherwise we choose approved cloud AI before generating. No automatic retry after a failed generation.{!firebaseAppCheckReady && ' Cloud AI needs Firebase App Check configured.'}</p></div>
     {plan && <section className="notice info compact-notice" aria-label="AI analysis results">
       <strong>Analysis complete</strong>
-      <p className="field-hint">{plan.attempts.length ? `Attempted: ${plan.attempts.map((source) => source === 'ON_DEVICE' ? 'on-device' : 'cloud').join(' → ')}` : 'No AI needed for these controls.'}</p>
+      <p className="field-hint">{plan.attempts.length ? `Attempted: ${plan.attempts.map((source) => source === 'ON_DEVICE' ? 'on-device' : 'cloud').join(' → ')}` : plan.entries.some((entry) => entry.status === 'needs_user') ? 'No AI generation was made. Saved answers remain available.' : 'Answers prepared from saved facts.'}</p>
       {plan.warnings.map((warning) => <p className="field-hint" key={warning}>{warning}</p>)}
     </section>}
     <button className="button primary wide scan-button" onClick={scanPage} disabled={loading || !restored || busy || !profile.updatedAt}>{busy ? 'Working…' : scan ? 'Scan and analyze again' : 'Scan and analyze with AI'}</button>
@@ -393,7 +393,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       const sensitive = needsConfirmation(field) || planned?.requiresConfirmation;
       const unsupported = !canPlan(field);
       return <div className="answer-row" key={field.id}><label className="answer-label" htmlFor={`answer-${field.id}`}>{field.label || 'Unlabeled field'}{field.required && <i>Required</i>}</label>
-        {field.description && <p className="field-hint">{field.description}</p>}<p className="field-hint">{outcomes[field.id] === 'verified' ? 'Filled and verified' : outcomes[field.id] === 'failed' ? 'Could not verify on the page — review this control' : readiness.find((item) => item.fieldId === field.id)?.status}</p>
+        {field.description && <p className="field-hint">{field.description}</p>}<p className="field-hint">{outcomes[field.id] === 'verified' ? 'Filled and verified' : outcomes[field.id] === 'skipped' ? 'Left unchanged: approval is needed or this control changed' : outcomes[field.id] === 'failed' ? 'Could not verify on the page — review this control' : readiness.find((item) => item.fieldId === field.id)?.status}</p>
         {['radio', 'select', 'select-one', 'choice'].includes(field.type) && field.options.length > 0 ? <select id={`answer-${field.id}`} disabled={busy} value={values[field.id] ?? ''} onChange={(event) => editAnswer(field.id, event.target.value)}><option value="">Choose an option</option>{field.options.map((option) => <option key={option}>{option}</option>)}</select>
           : field.type === 'checkbox' ? <select id={`answer-${field.id}`} disabled={busy} value={values[field.id] ?? ''} onChange={(event) => editAnswer(field.id, event.target.value)}><option value="">Leave unchanged</option><option value="true">Check this box</option><option value="false">Leave unchecked</option></select>
           : field.type === 'textarea' ? <textarea id={`answer-${field.id}`} rows={4} value={values[field.id] ?? ''} disabled={unsupported || busy} onChange={(event) => editAnswer(field.id, event.target.value)} placeholder={unsupported ? 'Review on the page' : suggested ? 'Suggested from your profile' : 'No saved answer'} />
