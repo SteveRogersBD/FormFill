@@ -8,7 +8,7 @@ import { emptyProfile } from '../profile';
 import { emptyPreferences } from '../preferences';
 import { SidePanel } from '../SidePanel';
 
-const mocks = vi.hoisted(() => ({ profile: vi.fn(), preferences: vi.fn(), plan: vi.fn(), message: vi.fn() }));
+const mocks = vi.hoisted(() => ({ profile: vi.fn(), preferences: vi.fn(), plan: vi.fn(), message: vi.fn(), session: new Map<string, unknown>() }));
 vi.mock('../data', () => ({ loadProfile: mocks.profile, loadPreferences: mocks.preferences, listApplications: async () => [], getResumeText: async () => 'Full resume text', getResumeAttachment: vi.fn(), saveApplication: vi.fn(), updateApplication: vi.fn() }));
 vi.mock('../firebase', () => ({ firebaseAppCheckReady: true }));
 vi.mock('../plannerModel', () => ({ planApplication: mocks.plan }));
@@ -23,6 +23,7 @@ const button = (label: string) => [...host.querySelectorAll('button')].find((ite
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  mocks.session.clear();
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   mocks.profile.mockResolvedValue({ ...emptyProfile(), updatedAt: 1 });
   mocks.preferences.mockResolvedValue({ ...emptyPreferences(), requiresSponsorship: 'no' });
@@ -33,7 +34,7 @@ beforeEach(async () => {
   mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => message.type === 'APPLYAI_SCAN_FIELDS' ? application : { filled: 1, failed: [] });
   vi.stubGlobal('chrome', {
     tabs: { query: async () => [{ id: 1, url: application.url }], sendMessage: mocks.message },
-    storage: { session: { get: async () => ({}), set: async () => {}, remove: async () => {} } }, permissions: { contains: async () => true },
+    storage: { session: { get: async (key: string) => ({ [key]: mocks.session.get(key) }), set: async (data: Record<string, unknown>) => { for (const [key, value] of Object.entries(data)) mocks.session.set(key, structuredClone(value)); }, remove: async (key: string) => { mocks.session.delete(key); } } }, permissions: { contains: async () => true },
     scripting: { executeScript: async () => [{ frameId: 0 }] },
   });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
@@ -42,6 +43,58 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 
 describe('AI side panel workflow', () => {
+  it('restores edited answers and context on reopen without another AI call, and can discard them', async () => {
+    await act(async () => button('Scan and analyze with AI').click());
+    const select = host.querySelectorAll('select')[0];
+    await act(async () => { select.value = 'Hybrid'; Simulate.change(select); });
+    await vi.waitFor(() => expect((mocks.session.get('applyAiWorkspace:user') as any)?.values['frame-0-a']).toBe('Hybrid'));
+    await act(async () => root.unmount());
+    root = createRoot(host);
+    await act(async () => { root.render(<SidePanel user={{ uid: 'user' } as User} onLogout={async () => {}} />); });
+    expect(host.querySelectorAll('select')[0].value).toBe('Hybrid');
+    expect(host.textContent).toContain('Restored your temporary application workspace');
+    expect((host.querySelector('textarea') as HTMLTextAreaElement).value).toBe(application.description);
+    expect(mocks.plan).toHaveBeenCalledOnce();
+    await act(async () => button('Discard').click());
+    expect(mocks.session.has('applyAiWorkspace:user')).toBe(false);
+    expect(host.textContent).not.toContain('Review answers');
+  });
+
+  it('does not generate until the full JD is supplied and sends pasted context in one batch', async () => {
+    mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => message.type === 'APPLYAI_SCAN_FIELDS' ? { ...application, description: '' } : { filled: 1, failed: [] });
+    await act(async () => button('Scan and analyze with AI').click());
+    expect(mocks.plan).not.toHaveBeenCalled();
+    const description = host.querySelector('textarea')!;
+    const full = 'Responsibilities '.repeat(1000) + 'FINAL REQUIREMENT';
+    await act(async () => { description.value = full; Simulate.change(description); });
+    await act(async () => button('Analyze answers again').click());
+    expect(mocks.plan).toHaveBeenCalledOnce();
+    expect(mocks.plan.mock.calls[0][0].job.description).toBe(full);
+  });
+
+  it('detects new conditional questions after filling and requires another scan', async () => {
+    let mutated = false;
+    mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => {
+      if (message.type === 'APPLYAI_FILL_FIELDS') { mutated = true; return { filled: 2, failed: [], outcomes: { a: 'verified', b: 'verified' } }; }
+      return mutated ? { ...application, fields: [...application.fields, { id: 'new', label: 'Explain your answer', type: 'textarea', required: true, options: [], selector: '' }] } : application;
+    });
+    await act(async () => button('Scan and analyze with AI').click());
+    await act(async () => (host.querySelector('.confirm-sensitive input') as HTMLInputElement).click());
+    await act(async () => button('Fill reviewed answers').click());
+    expect(host.textContent).toContain('Filling revealed new or changed questions');
+    expect(host.textContent).toContain('Filled and verified');
+    expect(button('Fill reviewed answers').disabled).toBe(true);
+    expect(mocks.plan).toHaveBeenCalledOnce();
+  });
+
+  it('refuses to fill a changed form before any page mutation', async () => {
+    await act(async () => button('Scan and analyze with AI').click());
+    await act(async () => (host.querySelector('.confirm-sensitive input') as HTMLInputElement).click());
+    mocks.message.mockResolvedValue({ ...application, fields: application.fields.slice(1) });
+    await act(async () => button('Fill reviewed answers').click());
+    expect(mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS')).toHaveLength(0);
+    expect(host.textContent).toContain('questions or options changed');
+  });
   it('analyzes the scan, displays provenance, and preserves edits when approved cloud fallback is rerun', async () => {
     await act(async () => button('Scan and analyze with AI').click());
     await vi.waitFor(() => expect(mocks.plan).toHaveBeenCalledOnce());
