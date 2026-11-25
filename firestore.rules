@@ -8,7 +8,7 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == userId;
       allow write: if request.auth != null && request.auth.uid == userId
         && request.resource.data.keys().hasOnly([
-          'workAuthorized', 'requiresSponsorship', 'sponsorshipFuture', 'visaStatus', 'workAuthExpiry',
+          'workAuthorized', 'requiresSponsorship', 'sponsorshipNowOrFuture', 'sponsorshipFuture', 'visaStatus', 'workAuthExpiry',
           'citizenship', 'clearanceLevel', 'exportControlEligible', 'inJobCountry',
           'desiredSalary', 'salaryCurrency', 'salaryPeriod', 'currentSalary',
           'earliestStartDate', 'noticePeriod', 'willingToRelocate', 'remotePreference',
