@@ -8,7 +8,7 @@ import { emptyProfile } from '../profile';
 import { emptyPreferences } from '../preferences';
 import { SidePanel } from '../SidePanel';
 
-const modelWork = vi.hoisted(() => ({ current: null as Promise<unknown> | null }));
+const modelWork = vi.hoisted(() => ({ current: null as Promise<unknown> | null, fill: null as Promise<unknown> | null }));
 
 vi.mock('../firebase', () => ({ firebaseAppCheckReady: false }));
 vi.mock('../data', () => ({
@@ -52,7 +52,9 @@ describe('complete contact autofill integration', () => {
       runtime: { onMessage: { addListener: (value: typeof listener) => { listener = value; } } },
       tabs: { query: async () => [{ id: 1, url: location.href }], sendMessage: async (_tab: number, message: unknown) => {
         messages.push(message); panel.hidden = true;
-        try { return await new Promise((resolve) => listener(message, {}, resolve)); }
+        const response = new Promise((resolve) => listener(message, {}, resolve));
+        if ((message as { type: string }).type === 'APPLYAI_FILL_FIELDS') modelWork.fill = response;
+        try { return await response; }
         finally { panel.hidden = false; }
       } },
       scripting: { executeScript: async () => [{ frameId: 0 }] }, permissions: { contains: async () => true },
@@ -66,6 +68,7 @@ describe('complete contact autofill integration', () => {
     const partial = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Fill prepared answers')!;
     expect(partial).toBeTruthy(); expect(partial.disabled, panel.textContent ?? '').toBe(false);
     await act(async () => partial.click());
+    await act(async () => { await vi.waitFor(() => expect(modelWork.fill).toBeTruthy()); expect(await modelWork.fill).toMatchObject({ filled: 7, failed: [] }); });
     const accepted = JSON.parse(job.querySelector('output')!.textContent!);
     expect(accepted).toMatchObject({ 'Full name': 'Riley Example', 'First name': 'Riley', 'Last name': 'Example', Email: 'riley@example.test', Phone: '+15550101234', 'Zip code': '60601', LinkedIn: 'https://linkedin.com/in/riley-example' });
     expect(job.querySelector('textarea')!.value).toBe('');
