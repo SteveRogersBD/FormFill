@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { runPlanner } from '../plannerGraph';
-import { makePlannerPrompt, validateProposal, type PlannerInput, type Proposal } from '../planner';
+import { makePlannerPrompt, savedPlan, validateProposal, type PlannerInput, type Proposal } from '../planner';
 import { emptyProfile } from '../profile';
 import { emptyPreferences } from '../preferences';
 import type { DetectedField } from '../fields';
@@ -13,6 +13,19 @@ const proposal = (fieldId: string, kind: Proposal['kind'], keys: string[], draft
 const response = (...answers: Proposal[]) => JSON.stringify({ answers });
 
 describe('application planning graph', () => {
+  it('resolves both Illumio answers from dashboard preferences without model inference', () => {
+    const request = input([
+      field('1', 'Are you authorized to work lawfully in the country for the position in which you are applying?', 'choice', ['Yes', 'No']),
+      field('2', 'Will you now or in the future require Illumio to commence (‘sponsor’) an immigration case in order to employ you?', 'choice', ['Yes', 'No']),
+    ]);
+    request.preferences.workAuthorized = 'yes';
+    request.preferences.sponsorshipNowOrFuture = 'yes';
+    const entries = savedPlan(request);
+    expect(entries.map((entry) => [entry.value, entry.requiresConfirmation, entry.evidence])).toEqual([
+      ['Yes', true, ['preferences.workAuthorized']],
+      ['Yes', true, ['preferences.sponsorshipNowOrFuture']],
+    ]);
+  });
   it('runs real LangGraph nodes and maps unfamiliar labels to existing facts on device', async () => {
     const request = input([field('1', 'Where should we consider you based?'), field('2', 'Professional networking page'), field('3', 'Mail routing code')]);
     const device = vi.fn().mockResolvedValue(response(proposal('1', 'profile', ['city', 'state']), proposal('2', 'profile', ['linkedin']), proposal('3', 'profile', ['postalCode'])));
