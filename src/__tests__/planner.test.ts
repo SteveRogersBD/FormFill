@@ -13,6 +13,11 @@ const proposal = (fieldId: string, kind: Proposal['kind'], keys: string[], draft
 const response = (...answers: Proposal[]) => JSON.stringify({ answers });
 
 describe('application planning graph', () => {
+  it('allows unfamiliar descriptive wording but rejects narrative answers to known factual questions', () => {
+    const request = input([]);
+    expect(validateProposal(proposal('1', 'draft', ['workExperience'], 'My dashboard work provides relevant experience.'), field('1', 'Give an example of relevant work', 'textarea'), request, 'IN_CLOUD')).toMatchObject({ status: 'needs_review', requiresConfirmation: true });
+    expect(validateProposal(proposal('2', 'draft', ['workExperience'], 'I worked on dashboards.'), field('2', 'Do you require sponsorship?', 'textarea'), request, 'IN_CLOUD')).toBeNull();
+  });
   it('retains the entire JD, resume, work history and every question in a single batch', async () => {
     const request = input([field('1', 'Email'), field('2', 'Why should we hire you?', 'textarea'), field('3', 'Why are you interested?', 'textarea')]);
     request.job.description = 'FULL JD '.repeat(2000) + 'FINAL JD REQUIREMENT';
