@@ -342,7 +342,7 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
       const elements = [...document.querySelectorAll<HTMLElement>(`[data-applyai-field="${CSS.escape(id)}"]`)];
       const first = elements[0];
       if (!first || !value || first.matches(':disabled, [aria-disabled="true"]')) continue;
-      if (first.matches('button, [role="radio"]')) {
+      if (first.matches('button, [role="radio"]') && first.getAttribute('role') !== 'combobox' && first.getAttribute('aria-haspopup') !== 'listbox') {
         const wanted = optionEquivalents(value);
         const choice = elements.find((element) => wanted.has(normalizeOption(element.textContent ?? '')));
         if (!choice || (choice instanceof HTMLButtonElement && choice.form && choice.type !== 'button')) continue;
