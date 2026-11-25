@@ -16,6 +16,51 @@ beforeEach(async () => {
 });
 
 describe('Ashby controls', () => {
+  it('captures full job descriptions and stable identities without entering answers', async () => {
+    const description = 'Responsibility '.repeat(900) + 'FINAL QUALIFICATION';
+    document.body.innerHTML = `<div data-job-description>${description}</div><label for="email">Email</label><input id="email" type="email" required maxlength="80">`;
+    const first = await scan();
+    expect(first.description).toBe(description);
+    expect(first.fields[0]).toMatchObject({ maxLength: 80, required: true, currentValue: '' });
+    const added = document.createElement('label'); added.innerHTML = 'Phone<input type="tel">';
+    document.body.prepend(added);
+    const second = await scan();
+    expect(second.fields.find((field: any) => field.label === 'Email').id).toBe(first.fields[0].id);
+    expect(document.querySelector<HTMLInputElement>('#email')!.value).toBe('');
+  });
+
+  it('scouts and fills a custom button dropdown through its offered options', async () => {
+    document.body.innerHTML = `<form><div class="ashby-application-form-field-entry"><label class="ashby-application-form-question-title">Gender</label><button type="button" role="combobox" aria-controls="gender-options" aria-expanded="false" aria-required="true">Choose</button><div id="gender-options"></div></div><button type="submit">Submit</button></form>`;
+    const combo = document.querySelector<HTMLButtonElement>('[role="combobox"]')!;
+    const list = document.getElementById('gender-options')!;
+    const submit = vi.fn(); document.querySelector('[type="submit"]')!.addEventListener('click', submit);
+    combo.addEventListener('click', () => {
+      const open = combo.getAttribute('aria-expanded') !== 'true';
+      combo.setAttribute('aria-expanded', String(open));
+      list.innerHTML = open ? '<div role="option">Man</div><div role="option">Woman</div>' : '';
+      list.querySelectorAll<HTMLElement>('[role="option"]').forEach((option) => option.addEventListener('click', () => { combo.textContent = option.textContent; combo.setAttribute('aria-expanded', 'false'); list.innerHTML = ''; }));
+    });
+    const { fields } = await scan();
+    expect(fields).toHaveLength(1);
+    expect(fields[0]).toMatchObject({ label: 'Gender', type: 'select', required: true, options: ['Man', 'Woman'], currentValue: '' });
+    expect(combo.textContent).toBe('Choose');
+    expect(await fill({ [fields[0].id]: 'Man' })).toMatchObject({ filled: 1, failed: [], outcomes: { [fields[0].id]: 'verified' } });
+    expect(combo.textContent).toBe('Man'); expect(submit).not.toHaveBeenCalled();
+  });
+
+  it('reports page handlers that reset values or ignore button selection', async () => {
+    document.body.innerHTML = '<label>Name<input></label><form><fieldset><legend>Authorized?</legend><button type="button" aria-pressed="false">Yes</button><button type="button" aria-pressed="false">No</button></fieldset></form>';
+    document.querySelector('input')!.addEventListener('change', (event) => { setTimeout(() => { (event.target as HTMLInputElement).value = ''; }, 20); });
+    const { fields } = await scan();
+    expect(await fill({ [fields[0].id]: 'Jordan', [fields[1].id]: 'Yes' })).toMatchObject({ filled: 0, failed: [fields[0].id, fields[1].id], outcomes: { [fields[0].id]: 'failed', [fields[1].id]: 'failed' } });
+  });
+
+  it('rejects native input values that violate page validation constraints', async () => {
+    document.body.innerHTML = '<label>Zip code<input pattern="[0-9]{5}" required></label>';
+    const { fields } = await scan();
+    expect(fields[0].pattern).toBe('[0-9]{5}');
+    expect(await fill({ [fields[0].id]: 'invalid' })).toMatchObject({ filled: 0, failed: [fields[0].id] });
+  });
   it('does not click submit buttons disguised as a choice group', async () => {
     document.body.innerHTML = '<form><fieldset><legend>Continue?</legend><button>Yes</button><button>No</button></fieldset></form>';
     expect((await scan()).fields).toHaveLength(0);
