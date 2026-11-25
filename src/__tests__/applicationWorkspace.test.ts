@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { applicationReadiness, clearWorkspace, loadWorkspace, saveWorkspace, type ApplicationWorkspace } from '../applicationWorkspace';
+import { applicationReadiness, clearWorkspace, loadWorkspace, prepareFill, saveWorkspace, type ApplicationWorkspace } from '../applicationWorkspace';
 
 const documents = new Map<string, unknown>();
 const workspace: ApplicationWorkspace = {
@@ -18,6 +18,27 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals());
 
 describe('application staging workspace', () => {
+  it('keeps contact answers fillable when another dropdown changes its options', () => {
+    const scan = { ...workspace.scan, fields: [...workspace.scan.fields, { id: 'choice', label: 'Preferred arrangement', type: 'select', required: true, selector: '', options: ['Remote', 'Hybrid'] }] };
+    const current = { ...scan, fields: scan.fields.map((field) => field.id === 'choice' ? { ...field, options: ['Onsite'] } : field) };
+    const result = prepareFill(scan, current, null, { name: 'Jordan', choice: 'Remote' }, {});
+    expect(result.targets.map((target) => target.originalId)).toEqual(['name']);
+    expect(result.skipped).toEqual([{ fieldId: 'choice', reason: expect.stringContaining('changed') }]);
+  });
+
+  it('remaps a unique unchanged question after a framework replaces generated IDs', () => {
+    const current = { ...workspace.scan, fields: workspace.scan.fields.map((field) => field.id === 'name' ? { ...field, id: 'new-react-id' } : field) };
+    expect(prepareFill(workspace.scan, current, null, workspace.values, {}).targets).toEqual([{ originalId: 'name', value: 'Jordan', field: expect.objectContaining({ id: 'new-react-id' }) }]);
+    const ambiguous = { ...current, fields: [...current.fields, { ...current.fields[0], id: 'another-name' }] };
+    expect(prepareFill(workspace.scan, ambiguous, null, workspace.values, {}).targets).toHaveLength(0);
+  });
+
+  it('does not transfer an answer to another frame or a question with changed instructions', () => {
+    const field = { ...workspace.scan.fields[0], frameId: 1, description: 'Applicant name' };
+    const scan = { ...workspace.scan, fields: [field] };
+    expect(prepareFill(scan, { ...scan, fields: [{ ...field, frameId: 2 }] }, null, workspace.values, {}).targets).toHaveLength(0);
+    expect(prepareFill(scan, { ...scan, fields: [{ ...field, description: 'Name of your reference' }] }, null, workspace.values, {}).targets).toHaveLength(0);
+  });
   it('restores full context, manual edits, approval state and field outcomes', async () => {
     await saveWorkspace({ ...workspace, confirmed: { name: true } });
     expect(await loadWorkspace('owner')).toEqual({ ...workspace, confirmed: { name: true } });
