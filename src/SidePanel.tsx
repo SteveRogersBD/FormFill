@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { PlannerResult } from './planner';
+import { canPlan, needsConfirmation, savedPlan, type PlannerResult } from './planner';
 import type { User } from 'firebase/auth';
 import { findProfileValue, isSensitiveField } from './fields';
-import { getResumeAttachment, listApplications, loadPreferences, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
+import { getResumeAttachment, getResumeText, listApplications, loadPreferences, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
 import { emptyProfile, PROFILE_FIELDS, type ResumeProfile } from './profile';
 import { emptyPreferences, PREFERENCE_FIELDS, type Preferences } from './preferences';
 import { matchQuestion, questionAnswer } from './questions';
 import { firebaseAppCheckReady } from './firebase';
-import { hostPermissionPattern, type ApplicationScan } from './applicationPage';
+import { completeJobContext, hostPermissionPattern, type ApplicationScan } from './applicationPage';
+import { applicationReadiness, clearWorkspace, loadWorkspace, saveWorkspace } from './applicationWorkspace';
 
 async function getActiveApplicationTab() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -73,6 +74,8 @@ async function scanActivePage(tabId: number): Promise<ScanAttempt> {
       company: applicationFrame?.scan.company || primary.company,
       role: applicationFrame?.scan.role || primary.role,
       description: applicationFrame?.scan.description || primary.description,
+      jobUrl: applicationFrame?.scan.jobUrl || primary.jobUrl,
+      tabId,
     },
   };
 }
@@ -95,26 +98,48 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const [cloudConsent, setCloudConsent] = useState(false);
   const [inferenceSource, setInferenceSource] = useState('');
   const [plan, setPlan] = useState<PlannerResult | null>(null);
+  const [resumeText, setResumeText] = useState('');
+  const [manualDone, setManualDone] = useState<Record<string, boolean>>({});
+  const [outcomes, setOutcomes] = useState<Record<string, 'verified' | 'failed'>>({});
+  const [restored, setRestored] = useState(false);
+  const [stale, setStale] = useState(false);
   const editedFields = useRef(new Set<string>());
+  const operation = useRef(0);
+  const owner = useRef(user.uid);
+  owner.current = user.uid;
 
   const editAnswer = (id: string, value: string) => {
     editedFields.current.add(id);
     setValues((current) => ({ ...current, [id]: value }));
     setConfirmed((current) => ({ ...current, [id]: false }));
+    setOutcomes((current) => { const next = { ...current }; delete next[id]; return next; });
   };
 
-  const analyze = async (application: ApplicationScan, currentProfile: ResumeProfile, currentPreferences: Preferences) => {
-    const { planApplication } = await import('./plannerModel');
-    const result = await planApplication({
+  const analyze = async (application: ApplicationScan, currentProfile: ResumeProfile, currentPreferences: Preferences, fullResumeText: string) => {
+    const token = operation.current;
+    const uid = user.uid;
+    const input = {
       fields: application.fields, profile: currentProfile, preferences: currentPreferences,
       job: { company: application.company, role: application.role, description: application.description },
+      resumeText: fullResumeText,
+      fixedAnswers: Object.fromEntries([...editedFields.current].map((id) => [id, values[id] ?? ''])),
       allowCloud: cloudConsent && firebaseAppCheckReady,
-    }, setNotice);
+    };
+    if (!application.description?.trim() || (currentProfile.resumePath && !fullResumeText.trim())) {
+      const result = { entries: savedPlan(input), attempts: [], warnings: ['Add the full job description and resume context below before making the AI request. Saved answers are prepared for review.'] } satisfies PlannerResult;
+      setPlan(result);
+      setValues((current) => ({ ...Object.fromEntries(result.entries.map((entry) => [entry.fieldId, entry.value])), ...Object.fromEntries([...editedFields.current].map((id) => [id, current[id] ?? ''])) }));
+      setNotice('Application staged. Add the missing context, then choose Analyze answers again.');
+      return;
+    }
+    const { planApplication } = await import('./plannerModel');
+    const result = await planApplication(input, (message) => { if (token === operation.current && owner.current === uid) setNotice(message); });
+    if (token !== operation.current || owner.current !== uid) return;
     setPlan(result);
     setValues((current) => ({ ...current, ...Object.fromEntries(result.entries.filter((entry) => !editedFields.current.has(entry.fieldId)).map((entry) => [entry.fieldId, entry.value])) }));
     setConfirmed({});
     const sources = [...new Set(result.entries.filter((entry) => entry.value).map((entry) => entry.source))];
-    setInferenceSource(sources.map((source) => source === 'ON_DEVICE' ? 'On-device AI' : source === 'IN_CLOUD' ? 'Cloud AI (approved)' : 'Saved facts').join(' · '));
+    setInferenceSource(sources.map((source) => source === 'ON_DEVICE' ? 'On-device AI' : source === 'IN_CLOUD' ? 'Cloud AI (approved)' : source === 'user' ? 'Your answers' : 'Saved facts').join(' · '));
     const ready = result.entries.filter((entry) => entry.value).length;
     setNotice(`${ready} of ${application.fields.length} questions have answers. Review them, then fill. Remaining questions need your input or manual handling.`);
   };
@@ -134,6 +159,33 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     void refreshProfile();
   }, [refreshProfile]);
 
+  useEffect(() => {
+    let cancelled = false;
+    operation.current += 1;
+    setRestored(false); setScan(null); setPlan(null); setValues({}); setConfirmed({}); setManualDone({}); setOutcomes({}); setResumeText(''); setCloudConsent(false); setBusy(false); setStale(false); editedFields.current.clear();
+    void loadWorkspace(user.uid).then((workspace) => {
+      if (cancelled || !workspace) return;
+      setScan(workspace.scan); setPlan(workspace.plan); setValues(workspace.values); setConfirmed(workspace.confirmed); setManualDone(workspace.manualDone); setResumeText(workspace.resumeText); setOutcomes(workspace.outcomes); setCompany(workspace.company); setRole(workspace.role);
+      editedFields.current = new Set(workspace.edited);
+      setNotice('Restored your temporary application workspace. Review it before filling.');
+    }).catch(() => { if (!cancelled) setError('Could not restore the temporary workspace. You can scan the application again.'); }).finally(() => { if (!cancelled) setRestored(true); });
+    return () => { cancelled = true; operation.current += 1; };
+  }, [user.uid]);
+
+  useEffect(() => {
+    if (!restored || !scan || scan.tabId === undefined || busy) return;
+    let cancelled = false;
+    void saveWorkspace({ version: 1, uid: user.uid, tabId: scan.tabId, scan, plan, values, confirmed, manualDone, edited: [...editedFields.current], company, role, resumeText, outcomes, updatedAt: Date.now() }).catch(() => { if (!cancelled) setError('The workspace could not be saved for this session. Keep this panel open to retain your answers.'); });
+    return () => { cancelled = true; };
+  }, [restored, scan, plan, values, confirmed, manualDone, company, role, resumeText, outcomes, busy, user.uid]);
+
+  const discard = async () => {
+    operation.current += 1;
+    setScan(null); setPlan(null); setValues({}); setConfirmed({}); setManualDone({}); setResumeText(''); setOutcomes({}); setInferenceSource(''); setStale(false); editedFields.current.clear();
+    await clearWorkspace(user.uid);
+    setNotice('Temporary application discarded.');
+  };
+
   const answerFor = useCallback((label: string) => {
     // A taxonomy hit is authoritative: an open-ended question must not be answered with a
     // profile list just because no standing answer exists yet.
@@ -141,8 +193,10 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   }, [preferences, profile]);
   const suggestions = useMemo(() => scan?.fields.map((field) => ({ field, suggested: answerFor(field.label) })) ?? [], [scan, answerFor]);
   const scanPage = async () => {
+    const uid = user.uid;
+    const token = ++operation.current;
     setBusy(true); setError(''); setNotice(''); setFilled(false);
-    setScan(null); setValues({}); setConfirmed({}); setInferenceSource(''); setPlan(null); editedFields.current.clear();
+    setConfirmed({}); setInferenceSource(''); setOutcomes({}); setStale(false);
     try {
       const tab = await getActiveApplicationTab();
       if (!tab.hasSiteAccess) {
@@ -157,17 +211,26 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         setNotice('The application is embedded on another site. Approve access to that site to scan its form.');
         return;
       }
-      const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid).catch(() => null)]);
+      const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid)]);
       const currentProfile = latestProfile ?? emptyProfile();
       const currentPreferences = latestPreferences ?? emptyPreferences();
       setProfile(currentProfile); setPreferences(currentPreferences);
-      const result = attempt.scan; setScan(result);
+      const result = await completeJobContext(attempt.scan);
+      let fullResumeText = profile.resumePath === currentProfile.resumePath ? resumeText : '';
+      if (currentProfile.resumePath && !fullResumeText) {
+        try { fullResumeText = await getResumeText(currentProfile.resumePath); }
+        catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not read resume text. Paste it below.'); }
+      }
+      if (token !== operation.current || owner.current !== uid) return;
+      // Keep edits only for stable questions on the same application tab.
+      if (scan?.url !== result.url || scan?.tabId !== result.tabId) editedFields.current.clear();
+      setScan(result); setResumeText(fullResumeText); setPlan(null); setManualDone({});
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
-      setValues(Object.fromEntries(result.fields.map((field) => [field.id, savedAnswer(field.label, currentProfile, currentPreferences)])));
+      setValues((current) => Object.fromEntries(result.fields.map((field) => [field.id, editedFields.current.has(field.id) ? current[field.id] ?? '' : field.currentValue || savedAnswer(field.label, currentProfile, currentPreferences)])));
       const pageType = result.platform === 'greenhouse' ? ' on this Greenhouse application' : '';
       setNotice(result.fields.length ? `Found ${result.fields.length} fields${pageType}. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
-      if (result.fields.length) await analyze(result, currentProfile, currentPreferences);
+      if (result.fields.length) await analyze(result, currentProfile, currentPreferences, fullResumeText);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not inspect this page.'); }
     finally { setBusy(false); }
   };
@@ -234,7 +297,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid).catch(() => null)]);
       const currentProfile = latestProfile ?? emptyProfile(); const currentPreferences = latestPreferences ?? emptyPreferences();
       setProfile(currentProfile); setPreferences(currentPreferences);
-      await analyze(scan, currentProfile, currentPreferences);
+      await analyze({ ...scan, company, role }, currentProfile, currentPreferences, resumeText);
     }
     catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not analyze the application. Saved answers are still available.'); }
     finally { setBusy(false); }
