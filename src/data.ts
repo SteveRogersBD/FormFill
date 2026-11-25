@@ -61,6 +61,15 @@ export async function getResumeUrl(path: string) {
   return getDownloadURL(ref(storage, path));
 }
 
+export async function getResumeText(path: string): Promise<string> {
+  const response = await fetch(await getResumeUrl(path));
+  if (!response.ok) throw new Error('Could not download resume context. Paste the resume text below.');
+  const bytes = await response.arrayBuffer();
+  if (!bytes.byteLength || bytes.byteLength > 10 * 1024 * 1024) throw new Error('The saved resume is empty or exceeds 10 MB.');
+  const { extractResumeText } = await import('./resumeParser');
+  return extractResumeText(bytes);
+}
+
 // Download in the extension, which has Storage host permission. A content script's
 // fetch runs under the application site's cross-origin restrictions.
 export async function getResumeAttachment(path: string) {
