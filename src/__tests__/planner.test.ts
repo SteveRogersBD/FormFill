@@ -1,13 +1,13 @@
 import { describe, expect, it, vi } from 'vitest';
 import { runPlanner } from '../plannerGraph';
 import { makePlannerPrompt, savedPlan, validateProposal, type PlannerInput, type Proposal } from '../planner';
-import { emptyProfile } from '../profile';
+import { emptyProfile, resumeProfileSchema } from '../profile';
 import { emptyPreferences } from '../preferences';
 import type { DetectedField } from '../fields';
 
 const field = (id: string, label: string, type = 'text', options: string[] = []): DetectedField => ({ id, label, type, options, required: true, selector: '' });
 function input(fields: DetectedField[], allowCloud = false): PlannerInput {
-  return { fields, profile: { ...emptyProfile(), fullName: 'Jordan Lee', email: 'jordan@example.com', city: 'Chicago', state: 'IL', postalCode: '60601', linkedin: 'linkedin.com/in/jordan', skills: ['TypeScript'], workExperience: ['Built internal dashboards.'] }, preferences: { ...emptyPreferences(), requiresSponsorship: 'no' }, job: { company: 'Illumio', role: 'Engineering Intern' }, allowCloud };
+  return { fields, profile: resumeProfileSchema.parse({ ...emptyProfile(), fullName: 'Jordan Lee', email: 'jordan@example.com', city: 'Chicago', state: 'IL', postalCode: '60601', linkedin: 'linkedin.com/in/jordan', skills: ['TypeScript'], workExperience: ['Built internal dashboards.'] }), preferences: { ...emptyPreferences(), requiresSponsorship: 'no' }, job: { company: 'Illumio', role: 'Engineering Intern' }, allowCloud };
 }
 const proposal = (fieldId: string, kind: Proposal['kind'], keys: string[], draft = ''): Proposal => ({ fieldId, kind, keys, draft, reason: 'Based on saved facts.' });
 const response = (...answers: Proposal[]) => JSON.stringify({ answers });
