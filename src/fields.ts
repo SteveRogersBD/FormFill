@@ -1,5 +1,4 @@
-import type { ProfileField, ResumeProfile } from './profile';
-import { profileFieldValue } from './profile';
+import { profileFieldValue, type ProfileField, type ResumeProfile } from './profile';
 import rules from '../shared/field-rules.json';
 
 export interface DetectedField {
