@@ -47,7 +47,7 @@ describe('extractProfileFromText', () => {
       university: 'State University',
       graduationDate: 'May 2026',
       skills: ['TypeScript', 'React', 'Accessibility'],
-      workExperience: ['Product Designer at Northstar Studio', 'Led user research and prototyping.'],
+      workExperience: [{ jobTitle: 'Product Designer', company: 'Northstar Studio', description: ['Led user research and prototyping.'] }],
       projects: ['Application Tracker', 'Built a job search dashboard.'],
       achievements: ['Design Challenge Winner', 'Recognized for inclusive product design.'],
     });
@@ -96,7 +96,7 @@ describe('extractProfileFromText', () => {
       university: 'Example University',
       graduationDate: 'May 2027',
       skills: ['TypeScript', 'React', 'Accessibility'],
-      workExperience: ['Designer at Example Studio', 'Led user research and prototyping.'],
+      workExperience: [{ jobTitle: 'Designer', company: 'Example Studio', description: ['Led user research and prototyping.'] }],
       projects: ['Application Assistant', 'Built a form autofill prototype.'],
       achievements: ['Design Fellowship'],
     });
@@ -130,7 +130,7 @@ describe('extractProfileFromText', () => {
 
     expect(profile).toMatchObject({
       skills: ['TypeScript', 'React'],
-      workExperience: ['Designer at Northstar', 'Led research studies.'],
+      workExperience: [{ jobTitle: 'Designer', company: 'Northstar', description: ['Led research studies.'] }],
       projects: ['Job Search Tracker'],
       achievements: ['Design Fellowship'],
     });
