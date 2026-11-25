@@ -403,14 +403,20 @@ if (!contentWorld.__applyAiPageListenerInstalled) {
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type === 'APPLYAI_SCAN_FIELDS') {
       const title = document.title;
+      void scoutCustomOptions().then(() => {
+      const context = inferContentPageContext(location.hostname, title, document.querySelector('h1')?.textContent ?? '');
+      const job = jobContext();
       sendResponse({
         fields: scanFields(),
         title,
         url: location.href,
         applicationFrameOrigins: applicationFrameOrigins(),
-        description: cleanLabelText(document.querySelector('.ashby-job-posting-description, #content .content, [data-job-description]')?.textContent).slice(0, 8000),
-        ...inferContentPageContext(location.hostname, title, document.querySelector('h1')?.textContent ?? ''),
+        ...context,
+        ...job,
+        company: job.company || context.company,
+        role: job.role || context.role,
       } satisfies ApplicationScan);
+      }).catch(() => sendResponse({ fields: [], title, url: location.href, ...inferContentPageContext(location.hostname, title) } satisfies ApplicationScan));
     }
     if (message?.type === 'APPLYAI_FILL_FIELDS') {
       fillFields(message.values ?? {}, message.resume).then(sendResponse).catch(() => sendResponse({ filled: 0, failed: Object.keys(message.values ?? {}) }));
