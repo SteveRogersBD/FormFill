@@ -1,7 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import * as pdfjs from 'pdfjs-dist';
 import { describe, expect, it } from 'vitest';
-import { extractProfile, extractProfileFromText } from '../resumeParser';
+import { extractProfile, extractProfileFromText, extractResumeText } from '../resumeParser';
 
 const resumeText = `
 Jane Doe
@@ -32,6 +32,14 @@ Recognized for inclusive product design.
 `;
 
 describe('extractProfileFromText', () => {
+  it('retains unstructured source evidence when extracting the full saved PDF text', async () => {
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL('../../node_modules/pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;
+    const bytes = await readFile(new URL('./fixtures/sample-resume.pdf', import.meta.url));
+    const text = await extractResumeText(Uint8Array.from(bytes).buffer);
+    expect(text).toContain('Riley Example');
+    expect(text).toContain('Led user research and prototyping.');
+    expect(text).toContain('Design Fellowship');
+  });
   it('reads inline contact locations and links without a URL scheme', () => {
     expect(extractProfileFromText('Jane Doe\njane@example.com | Chicago, IL 60601 | +1 555 212 5555\nwww.janedoe.dev\nlinkedin.com/in/jane-doe')).toMatchObject({
       city: 'Chicago', state: 'IL', postalCode: '60601', portfolio: 'www.janedoe.dev', linkedin: 'linkedin.com/in/jane-doe',
