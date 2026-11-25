@@ -11,6 +11,12 @@ export interface DetectedField {
   frameId?: number;
   frameFieldId?: string;
   description?: string;
+  section?: string;
+  currentValue?: string;
+  maxLength?: number;
+  min?: string;
+  max?: string;
+  pattern?: string;
 }
 
 type MatchKey = ProfileField | 'firstName' | 'lastName';
