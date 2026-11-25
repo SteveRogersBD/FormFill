@@ -1,4 +1,5 @@
 import type { ProfileField, ResumeProfile } from './profile';
+import { profileFieldValue } from './profile';
 import rules from '../shared/field-rules.json';
 
 export interface DetectedField {
@@ -53,7 +54,7 @@ export function findProfileValue(label: string, profile: ResumeProfile): string 
   if (key === 'firstName') value = nameParts[0] ?? '';
   else if (key === 'lastName') value = nameParts.length > 1 ? nameParts[nameParts.length - 1] : '';
   else if (key === 'city' && /\blocation\b/.test(normalized) && profile.city.trim()) value = [profile.city, profile.state, profile.country].filter(Boolean).join(', ');
-  else value = profile[key];
+  else value = profileFieldValue(profile, key);
   let text = Array.isArray(value) ? value.join(', ') : value;
   if ((key === 'linkedin' || key === 'portfolio') && text.trim() && !/^https?:\/\//i.test(text)) text = `https://${text}`;
   return text.trim() ? text : undefined;
