@@ -89,7 +89,7 @@ export function validateProposal(proposal: Proposal, field: DetectedField, input
     const key = proposal.keys[0] as AnswerKey;
     if (!PREFERENCE_FIELDS.some((item) => item.key === key)) return null;
     if (question && (question.answerFrom !== 'preferences' || question.prefKey !== key)) return null;
-    const eeo = ['gender', 'pronouns', 'transgenderStatus', 'sexualOrientation', 'raceEthnicity', 'hispanicLatino', 'veteranStatus', 'disabilityStatus'].includes(key);
+    const eeo = ['gender', 'pronouns', 'transgenderStatus', 'sexualOrientation', 'lgbtqIdentity', 'raceEthnicity', 'hispanicLatino', 'veteranStatus', 'disabilityStatus'].includes(key);
     if (eeo && !input.preferences.eeoOptIn) return null;
     // Employer-relative facts cannot be assumed to apply to the current company.
     if (['previouslyEmployedHere', 'relativeEmployedHere', 'previouslyApplied'].includes(key)) confirmation = true;
