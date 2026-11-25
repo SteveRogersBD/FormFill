@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { draftCoverLetterInCloud, draftCoverLetterOnDevice } from '../ai';
-import { emptyProfile } from '../profile';
+import { emptyProfile, resumeProfileSchema } from '../profile';
 
 const aiMocks = vi.hoisted(() => ({
   getAI: vi.fn(() => ({})),
@@ -20,7 +20,7 @@ vi.mock('firebase/ai', () => ({
 }));
 vi.mock('firebase/app', () => ({ getApp: aiMocks.getApp }));
 
-const profile = {
+const profile = resumeProfileSchema.parse({
   ...emptyProfile(),
   fullName: 'Jordan Lee',
   email: 'jordan@example.com',
@@ -28,7 +28,7 @@ const profile = {
   targetRole: 'Product Designer',
   skills: ['Research', 'Prototyping'],
   workExperience: ['Led user research for onboarding.'],
-};
+});
 
 describe('cover letter drafting', () => {
   beforeEach(() => {
