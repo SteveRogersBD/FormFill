@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { emptyProfile, formatWorkExperience, resumeProfileSchema, workExperienceSchema } from '../profile';
 
 describe('resumeProfileSchema', () => {
+  it('rejects duplicate experience identities that would make edits ambiguous', () => {
+    const entry = workExperienceSchema.parse({ id: 'same-id', jobTitle: 'Engineer' });
+    expect(resumeProfileSchema.safeParse({ workExperience: [entry, entry] }).success).toBe(false);
+  });
   it('keeps dates and locations embedded in imported role headings', () => {
     const profile = resumeProfileSchema.parse({ workExperience: ['Engineer at Example | Chicago, IL | Jun 2024 – Aug 2024'] });
     expect(profile.workExperience[0]).toMatchObject({ company: 'Example', jobTitle: 'Engineer', summary: 'Chicago, IL · Jun 2024 – Aug 2024' });
