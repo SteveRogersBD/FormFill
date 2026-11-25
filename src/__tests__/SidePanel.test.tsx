@@ -43,6 +43,23 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 
 describe('AI side panel workflow', () => {
+  it('loads the saved PDF text before generation and stages it with the full JD', async () => {
+    mocks.profile.mockResolvedValue({ ...emptyProfile(), resumePath: 'resumes/user/current.pdf', updatedAt: 2 });
+    await act(async () => button('Scan and analyze with AI').click());
+    expect(mocks.plan).toHaveBeenCalledOnce();
+    expect(mocks.plan.mock.calls[0][0]).toMatchObject({ resumeText: 'Full resume text', job: { description: application.description } });
+    await vi.waitFor(() => expect((mocks.session.get('applyAiWorkspace:user') as any)?.resumeText).toBe('Full resume text'));
+    expect((mocks.session.get('applyAiWorkspace:user') as any).resumePath).toBe('resumes/user/current.pdf');
+  });
+
+  it('protects manual edits when rescanning matching questions on the same application', async () => {
+    await act(async () => button('Scan and analyze with AI').click());
+    const select = host.querySelectorAll('select')[0];
+    await act(async () => { select.value = 'Hybrid'; Simulate.change(select); });
+    await act(async () => button('Scan and analyze again').click());
+    expect(host.querySelectorAll('select')[0].value).toBe('Hybrid');
+    expect(mocks.plan.mock.calls[1][0].fixedAnswers).toEqual({ 'frame-0-a': 'Hybrid' });
+  });
   it('restores edited answers and context on reopen without another AI call, and can discard them', async () => {
     await act(async () => button('Scan and analyze with AI').click());
     const select = host.querySelectorAll('select')[0];
