@@ -84,7 +84,14 @@ export async function savePreferences(preferences: Preferences, uid: string) {
   const { db } = await getFirebaseServices();
   const { doc, setDoc } = await import('firebase/firestore');
   const savedPreferences = preferencesSchema.parse({ ...preferences, updatedAt: Date.now() });
-  await setDoc(doc(db, 'users', uid, 'preferences', 'current'), savedPreferences);
+  try {
+    await setDoc(doc(db, 'users', uid, 'preferences', 'current'), savedPreferences);
+  } catch (reason) {
+    if (reason && typeof reason === 'object' && 'code' in reason && reason.code === 'permission-denied') {
+      throw new Error('Your Equal Employment answers were not saved because Firebase denied the write. Update the Firestore rules for this app, then retry.', { cause: reason });
+    }
+    throw reason;
+  }
   return savedPreferences;
 }
 
