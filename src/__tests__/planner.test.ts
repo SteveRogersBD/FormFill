@@ -13,6 +13,50 @@ const proposal = (fieldId: string, kind: Proposal['kind'], keys: string[], draft
 const response = (...answers: Proposal[]) => JSON.stringify({ answers });
 
 describe('application planning graph', () => {
+  it('retains the entire JD, resume, work history and every question in a single batch', async () => {
+    const request = input([field('1', 'Email'), field('2', 'Why should we hire you?', 'textarea'), field('3', 'Why are you interested?', 'textarea')]);
+    request.job.description = 'FULL JD '.repeat(2000) + 'FINAL JD REQUIREMENT';
+    request.resumeText = 'FULL RESUME '.repeat(2000) + 'FINAL RESUME FACT';
+    request.profile.projects = Array.from({ length: 20 }, (_, index) => `Project ${index} ${'evidence '.repeat(160)}`);
+    const device = vi.fn().mockResolvedValue(response(proposal('2', 'draft', ['skills', 'resumeText'], 'I bring TypeScript experience relevant to this role.'), proposal('3', 'draft', ['workExperience'], 'This role aligns with my dashboard development experience.')));
+    const cloud = vi.fn();
+    const result = await runPlanner(request, { prepareDevice: async () => true, device, cloud });
+    const data = JSON.parse(device.mock.calls[0][0].split('DATA:\n')[1]);
+    expect(data.job.description).toBe(request.job.description);
+    expect(data.resumeText).toBe(request.resumeText);
+    expect(data.profile.projects).toEqual(request.profile.projects);
+    expect(data.fields).toHaveLength(3);
+    expect(data.targetIds).toEqual(['2', '3']);
+    expect(result.entries.slice(1).every((entry) => entry.value && entry.requiresConfirmation && entry.status === 'needs_review')).toBe(true);
+    expect(device).toHaveBeenCalledOnce(); expect(cloud).not.toHaveBeenCalled();
+  });
+
+  it('keeps manual edits fixed and reports omitted answers without a second request', async () => {
+    const request = input([field('1', 'Preferred city'), field('2', 'Unfamiliar field')], true);
+    request.fixedAnswers = { '1': 'My reviewed answer' };
+    const device = vi.fn().mockResolvedValue(response(proposal('1', 'profile', ['state'])));
+    const cloud = vi.fn();
+    const result = await runPlanner(request, { prepareDevice: async () => true, device, cloud });
+    expect(result.entries[0]).toMatchObject({ value: 'My reviewed answer', source: 'user' });
+    expect(result.entries[1]).toMatchObject({ status: 'needs_user', reason: expect.stringContaining('did not return') });
+    expect(device).toHaveBeenCalledOnce(); expect(cloud).not.toHaveBeenCalled();
+  });
+
+  it('maps equivalent demographic option wording only from opted-in saved facts and holds it for review', () => {
+    const request = input([]); request.preferences.gender = 'Male'; request.preferences.eeoOptIn = true;
+    const selected = { ...proposal('1', 'preference', ['gender']), option: 'Man' };
+    const control = field('1', 'Gender', 'select', ['Man', 'Woman', 'Prefer not to say']);
+    expect(validateProposal(selected, control, request, 'ON_DEVICE')).toMatchObject({ value: 'Man', status: 'needs_review', requiresConfirmation: true, reason: expect.stringContaining('Saved answer: Male') });
+    request.preferences.eeoOptIn = false;
+    expect(validateProposal(selected, control, request, 'ON_DEVICE')).toBeNull();
+  });
+
+  it('skips all model work when saved facts cover the form', async () => {
+    const prepareDevice = vi.fn(); const device = vi.fn(); const cloud = vi.fn();
+    const result = await runPlanner(input([field('1', 'Email')], true), { prepareDevice, device, cloud });
+    expect(result.attempts).toEqual([]);
+    expect(prepareDevice).not.toHaveBeenCalled(); expect(device).not.toHaveBeenCalled(); expect(cloud).not.toHaveBeenCalled();
+  });
   it('resolves both Illumio answers from dashboard preferences without model inference', () => {
     const request = input([
       field('1', 'Are you authorized to work lawfully in the country for the position in which you are applying?', 'choice', ['Yes', 'No']),
