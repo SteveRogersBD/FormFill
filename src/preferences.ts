@@ -11,6 +11,7 @@ const yesNoDecline = z.enum(['', 'yes', 'no', 'decline']).default('');
 export const preferencesSchema = z.object({
   workAuthorized: yesNoUnsure,
   requiresSponsorship: yesNoUnsure,
+  sponsorshipNowOrFuture: yesNoUnsure,
   sponsorshipFuture: yesNoUnsure,
   visaStatus: z.string().max(120).default(''),
   workAuthExpiry: z.string().max(20).default(''),
@@ -85,7 +86,8 @@ export const PREFERENCE_GROUPS: PreferenceGroup[] = [
     eyebrow: 'WORK ELIGIBILITY',
     title: 'Right to work',
     fields: [
-      { key: 'workAuthorized', label: 'Are you authorized to work in the job’s country?', choices: YES_NO_UNSURE },
+      { key: 'workAuthorized', label: 'Are you authorized to work lawfully in the country for the position in which you are applying?', choices: YES_NO_UNSURE },
+      { key: 'sponsorshipNowOrFuture', label: 'Will you now or in the future require the employer to commence (‘sponsor’) an immigration case in order to employ you?', hint: 'Used for the Illumio question and equivalent questions from other employers. Answer separately from sponsorship now or future-only sponsorship.', choices: YES_NO_UNSURE },
       { key: 'requiresSponsorship', label: 'Do you require visa sponsorship now?', choices: YES_NO_UNSURE },
       { key: 'sponsorshipFuture', label: 'Will you require sponsorship in the future?', choices: YES_NO_UNSURE },
       { key: 'visaStatus', label: 'Current visa or immigration status', hint: 'For example H-1B, F-1 OPT, Green Card, citizen' },
