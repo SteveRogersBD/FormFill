@@ -5,13 +5,21 @@ import { emptyPreferences } from '../preferences';
 describe('matchQuestion', () => {
   it('maps the same question however a portal phrases it', () => {
     for (const label of [
-      'Will you now or in the future require visa sponsorship?',
       'Do you require sponsorship?',
       'Do you need any help with visa?',
       'Will you require work authorization?',
     ]) {
       expect(matchQuestion(label)?.id).toBe('requiresSponsorship');
     }
+  });
+
+  it('matches the exact Illumio questions and separates combined sponsorship from current sponsorship', () => {
+    expect(matchQuestion('Are you authorized to work lawfully in the country for the position in which you are applying?')?.id).toBe('workAuthorized');
+    expect(matchQuestion('Will you now or in the future require Illumio to commence (‘sponsor’) an immigration case in order to employ you?')?.id).toBe('sponsorshipNowOrFuture');
+    expect(matchQuestion('Will you now or in the future require visa sponsorship?')?.id).toBe('sponsorshipNowOrFuture');
+    expect(matchQuestion('Will you require sponsorship now or in the future?')?.id).toBe('sponsorshipNowOrFuture');
+    expect(matchQuestion('Do you currently require sponsorship?')?.id).toBe('requiresSponsorship');
+    expect(matchQuestion('Will you require sponsorship in the future?')?.id).toBe('sponsorshipFuture');
   });
 
   it('keeps sponsorship and visa status apart when both share the word visa', () => {
@@ -85,6 +93,13 @@ describe('questionAnswer', () => {
   it('leaves unanswered questions empty rather than guessing', () => {
     expect(questionAnswer(matchQuestion('What are your salary expectations?')!, preferences)).toBe('');
     expect(questionAnswer(matchQuestion('Why do you want to join Acme?')!, preferences)).toBe('');
+  });
+
+  it('does not treat no current sponsorship as no future sponsorship', () => {
+    const combined = matchQuestion('Will you now or in the future require Illumio to commence (‘sponsor’) an immigration case in order to employ you?')!;
+    expect(questionAnswer(combined, { ...emptyPreferences(), requiresSponsorship: 'no', sponsorshipFuture: 'yes' })).toBe('');
+    expect(questionAnswer(combined, { ...emptyPreferences(), sponsorshipNowOrFuture: 'yes' })).toBe('Yes');
+    expect(questionAnswer(combined, { ...emptyPreferences(), sponsorshipNowOrFuture: 'no' })).toBe('No');
   });
 
   it('maps a declined voluntary question to a decline answer', () => {
