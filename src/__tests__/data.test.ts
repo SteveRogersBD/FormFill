@@ -16,6 +16,13 @@ beforeEach(() => {
 });
 
 describe('Equal Employment persistence', () => {
+  it('requires Firestore rules to allow every serialized preference field', async () => {
+    const rules = await readFile(new URL('../../firestore.rules', import.meta.url), 'utf8');
+    const preferencesRule = rules.split('match /users/{userId}/preferences/{preferenceId}')[1].split('match /users/{userId}/applications')[0];
+    const allowedList = preferencesRule.split('hasOnly([')[1].split('])')[0];
+    const allowedKeys = [...allowedList.matchAll(/'([^']+)'/g)].map((match) => match[1]);
+    expect(new Set(allowedKeys)).toEqual(new Set(Object.keys(preferencesSchema.shape)));
+  });
   it('keeps old answers after a denied write and explains the deployment problem', async () => {
     const saved = await savePreferences({ ...emptyPreferences(), workCountries: 'Canada' }, 'owner');
     mocks.setDoc.mockRejectedValueOnce({ code: 'permission-denied', message: 'Missing or insufficient permissions.' });
