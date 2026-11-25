@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { emptyProfile, resumeProfileSchema } from '../profile';
+import { emptyProfile, formatWorkExperience, resumeProfileSchema, workExperienceSchema } from '../profile';
 
 describe('resumeProfileSchema', () => {
   it('accepts a complete editable profile', () => {
