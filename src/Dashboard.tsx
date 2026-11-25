@@ -70,20 +70,39 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
     setDraftPreferences((current) => ({ ...current, [key]: value }));
   };
 
-  const saveStandingAnswers = async () => {
-    setWorking(true); setError(''); setMessage('');
+  const saveEditor = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setWorking(true); setEditorError(''); setMessage('');
     try {
-      const saved = await savePreferences(preferences, user.uid);
-      setPreferences(saved); setMessage('Standing answers saved. Scanned forms will use them from now on.');
-    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save your standing answers. Check your Firebase configuration and rules.'); }
+      if (editing === 'employment') {
+        const saved = await savePreferences(preferencesSchema.parse(draftPreferences), user.uid);
+        setPreferences(saved); setMessage('Standing answers saved. Scanned forms will use them from now on.');
+      } else {
+        const validated = resumeProfileSchema.safeParse(draftProfile);
+        if (!validated.success) {
+          const issue = validated.error.issues[0];
+          const row = issue.path[0] === 'workExperience' && typeof issue.path[1] === 'number' ? `Work experience ${issue.path[1] + 1}: ` : '';
+          setEditorError(`${row}${issue.message}`); return;
+        }
+        const currentRole = editing === 'experience' ? validated.data.workExperience.find((entry) => entry.current) : undefined;
+        const reviewed = currentRole ? { ...validated.data, currentTitle: currentRole.jobTitle, currentCompany: currentRole.company } : validated.data;
+        const saved = file ? await saveResume(file, reviewed, user.uid) : await saveProfile(reviewed, user.uid);
+        setProfile(saved); setFile(null); setMessage('Your reviewed profile is saved. Future scans will use these details.');
+      }
+      setEditing(null);
+    } catch (reason) { setEditorError(reason instanceof Error ? reason.message : 'Could not save these details. Your draft is still here.'); }
     finally { setWorking(false); }
   };
 
-  // Deep links from the side panel (#sa-visaStatus) open the exact question to fill in.
   useEffect(() => {
+    if (!loaded) return;
     const target = window.location.hash.slice(1);
-    if (!loading && target) document.getElementById(target)?.scrollIntoView({ block: 'center' });
-  }, [loading]);
+    if (target.startsWith('sa-') || target === 'standing-answers') {
+      setDraftProfile(resumeProfileSchema.parse(profile)); setDraftPreferences(preferencesSchema.parse(preferences)); setEditing('employment');
+    } else if (target) document.getElementById(target)?.scrollIntoView({ block: 'start' });
+    // Deep links apply once when data loads; normal editor actions manage later drafts.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loaded]);
 
   const save = async () => {
     setWorking(true); setError(''); setMessage('');
