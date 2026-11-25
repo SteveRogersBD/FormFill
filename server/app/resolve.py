@@ -63,6 +63,16 @@ def profile_value(label: str, profile: Mapping[str, Any]) -> tuple[str, str] | N
     return None
 
 
+def _experience_text(entry: Any) -> str:
+    if not isinstance(entry, dict):
+        return str(entry)
+    title = " at ".join(str(entry.get(key) or "") for key in ("jobTitle", "company") if entry.get(key))
+    context = " · ".join(str(entry.get(key) or "") for key in ("jobType", "location") if entry.get(key))
+    dates = " – ".join(str(value) for value in (entry.get("startDate"), "Present" if entry.get("current") else entry.get("endDate")) if value)
+    description = entry.get("description") or []
+    return "\n".join(str(value) for value in (title, context, dates, entry.get("summary"), *description) if value)
+
+
 def _read_profile(profile: Mapping[str, Any], key: str) -> str:
     if key in {"firstName", "lastName"}:
         parts = str(profile.get("fullName") or "").split()
