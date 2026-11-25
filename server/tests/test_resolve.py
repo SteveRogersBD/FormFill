@@ -3,6 +3,13 @@ from app.models import FieldIn
 from app.resolve import Facts, load_known, resolve
 
 
+def test_structured_experience_resolves_as_readable_profile_evidence():
+    fields = [FieldIn(field_id="experience", label="Work experience", field_type="textarea")]
+    profile = {"workExperience": [{"jobTitle": "Engineer", "company": "Example", "jobType": "Full-time", "location": "Chicago", "startDate": "2024-01", "current": True, "description": ["Built dashboards."]}]}
+    result = resolve(fields, Facts(profile=profile), {}, "")
+    assert result.answers[0].value == "Engineer at Example\nFull-time · Chicago\n2024-01 – Present\nBuilt dashboards."
+
+
 def test_a_preference_answers_its_question_without_a_model_call():
     fields = [
         FieldIn(
