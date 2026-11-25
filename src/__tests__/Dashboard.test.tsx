@@ -32,6 +32,26 @@ async function renderDashboard() {
 }
 
 describe('dashboard work eligibility answers', () => {
+  it('retains editor drafts when saving fails and prevents reversed work dates', async () => {
+    mocks.loadProfile.mockResolvedValue(resumeProfileSchema.parse({ workExperience: [workExperienceSchema.parse({ id: 'role-1', jobTitle: 'Engineer', company: 'Example', startDate: '2024-06', endDate: '2024-08' })] }));
+    const { host, root } = await renderDashboard();
+    try {
+      await act(async () => (host.querySelector('[aria-label="Edit Work Experience"]') as HTMLButtonElement).click());
+      const date = host.querySelectorAll<HTMLInputElement>('input[type="month"]')[1];
+      await act(async () => { date.value = '2024-01'; Simulate.change(date); });
+      await act(async () => Simulate.submit(host.querySelector('form')!));
+      expect(mocks.saveProfile).not.toHaveBeenCalled();
+      expect(host.querySelector('[role="dialog"] [role="alert"]')!.textContent).toContain('End date must be on or after');
+      await act(async () => { date.value = '2024-09'; Simulate.change(date); });
+      mocks.saveProfile.mockRejectedValueOnce(new Error('Offline. Try again.'));
+      await act(async () => Simulate.submit(host.querySelector('form')!));
+      expect(date.value).toBe('2024-09');
+      expect(host.querySelector('[role="dialog"] [role="alert"]')!.textContent).toContain('Offline');
+      await act(async () => Simulate.submit(host.querySelector('form')!));
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+      expect(host.querySelector('#experience')!.textContent).toContain('2024-09');
+    } finally { await act(async () => root.unmount()); host.remove(); }
+  });
   it('cancels draft deletions and clears an end date when a role becomes current', async () => {
     mocks.loadProfile.mockResolvedValue(resumeProfileSchema.parse({ workExperience: [workExperienceSchema.parse({ id: 'role-1', company: 'Example', jobTitle: 'Engineer', startDate: '2024-01', endDate: '2024-06' })] }));
     const { host, root } = await renderDashboard();
