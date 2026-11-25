@@ -3,6 +3,13 @@ import { matchQuestion, questionAnswer } from '../questions';
 import { emptyPreferences } from '../preferences';
 
 describe('matchQuestion', () => {
+  it('maps the additional common questions shown in the reference dashboard', () => {
+    expect(matchQuestion('Countries where you want to work')?.id).toBe('workCountries');
+    expect(matchQuestion('Are you a citizen of the United States?')?.id).toBe('usCitizen');
+    expect(matchQuestion('What is your citizenship?')?.id).toBe('citizenship');
+    expect(matchQuestion('Do you identify as LGBTQ+?')?.id).toBe('lgbtqIdentity');
+    expect(matchQuestion('What is your sexual orientation?')?.id).toBe('sexualOrientation');
+  });
   it('maps the same question however a portal phrases it', () => {
     for (const label of [
       'Do you require sponsorship?',
