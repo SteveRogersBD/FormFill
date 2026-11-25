@@ -77,6 +77,10 @@ export const resumeProfileSchema = z.object({
 export type ResumeProfile = z.infer<typeof resumeProfileSchema>;
 export type ProfileField = Exclude<keyof ResumeProfile, 'resumePath' | 'updatedAt'>;
 
+export function profileFieldValue(profile: ResumeProfile, key: ProfileField): string | string[] {
+  return key === 'workExperience' ? formatWorkExperience(profile.workExperience) : profile[key];
+}
+
 export const PROFILE_FIELDS: { key: ProfileField; label: string; multiline?: boolean; list?: boolean }[] = [
   { key: 'fullName', label: 'Full name' },
   { key: 'email', label: 'Email' },
