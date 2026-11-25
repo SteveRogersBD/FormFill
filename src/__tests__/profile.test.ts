@@ -2,6 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { emptyProfile, formatWorkExperience, resumeProfileSchema, workExperienceSchema } from '../profile';
 
 describe('resumeProfileSchema', () => {
+  it('keeps dates and locations embedded in imported role headings', () => {
+    const profile = resumeProfileSchema.parse({ workExperience: ['Engineer at Example | Chicago, IL | Jun 2024 – Aug 2024'] });
+    expect(profile.workExperience[0]).toMatchObject({ company: 'Example', jobTitle: 'Engineer', summary: 'Chicago, IL · Jun 2024 – Aug 2024' });
+    expect(formatWorkExperience(profile.workExperience)[0]).toContain('Jun 2024 – Aug 2024');
+  });
   it('rejects invalid months reversed dates and contradictory current roles', () => {
     expect(workExperienceSchema.safeParse({ id: '1', startDate: '2024-13' }).success).toBe(false);
     expect(workExperienceSchema.safeParse({ id: '1', startDate: '2025-01', endDate: '2024-12' }).success).toBe(false);
