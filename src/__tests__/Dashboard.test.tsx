@@ -32,6 +32,25 @@ async function renderDashboard() {
 }
 
 describe('dashboard work eligibility answers', () => {
+  it('cancels draft deletions and clears an end date when a role becomes current', async () => {
+    mocks.loadProfile.mockResolvedValue(resumeProfileSchema.parse({ workExperience: [workExperienceSchema.parse({ id: 'role-1', company: 'Example', jobTitle: 'Engineer', startDate: '2024-01', endDate: '2024-06' })] }));
+    const { host, root } = await renderDashboard();
+    try {
+      await act(async () => (host.querySelector('[aria-label="Edit Work Experience"]') as HTMLButtonElement).click());
+      await act(async () => (host.querySelector('[aria-label="Remove work experience 1"]') as HTMLButtonElement).click());
+      expect(host.querySelector('.experience-editor-entry')).toBeNull();
+      await act(async () => [...host.querySelectorAll('button')].find((button) => button.textContent === 'Cancel')!.click());
+      expect(host.querySelector('#experience')!.textContent).toContain('Example');
+      expect(mocks.saveProfile).not.toHaveBeenCalled();
+      await act(async () => (host.querySelector('[aria-label="Edit Work Experience"]') as HTMLButtonElement).click());
+      await act(async () => (host.querySelector('.current-role-choice input') as HTMLInputElement).click());
+      const endDate = host.querySelectorAll<HTMLInputElement>('input[type="month"]')[1];
+      expect(endDate.disabled).toBe(true); expect(endDate.value).toBe('');
+      await act(async () => Simulate.submit(host.querySelector('form')!));
+      expect(mocks.saveProfile.mock.calls[0][0]).toMatchObject({ currentTitle: 'Engineer', currentCompany: 'Example', workExperience: [expect.objectContaining({ current: true, endDate: '' })] });
+      expect(host.querySelector('#experience')!.textContent).toContain('Present');
+    } finally { await act(async () => root.unmount()); host.remove(); }
+  });
   it('adds and saves separate experience records without losing descriptions', async () => {
     mocks.loadProfile.mockResolvedValue(resumeProfileSchema.parse({ workExperience: ['Engineer at Northstar', 'Built the original platform.'] }));
     const { host, root } = await renderDashboard();
