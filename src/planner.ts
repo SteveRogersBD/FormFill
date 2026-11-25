@@ -138,9 +138,10 @@ export function validateProposal(proposal: Proposal, field: DetectedField, input
     value = facts.join(', ');
     evidence = proposal.keys.map((key) => `profile.${key}`);
   } else {
-    // Narrative drafting is limited to recognized open questions. Every draft is held
-    // for review even when the model cites existing career facts.
-    const narrative = question?.answerFrom === 'llm' || (!question && ['text', 'textarea'].includes(field.type) && /\b(why|describe|explain|tell us|what (?:interests|motivates)|how (?:would|have|did|do))\b/i.test(field.label));
+    // Let semantic classification handle unfamiliar narrative wording. Known
+    // factual questions stay protected; every draft still needs career evidence
+    // and applicant review before it can be entered.
+    const narrative = ['text', 'textarea'].includes(field.type) && (!question || question.answerFrom === 'llm');
     if (confirmation || !narrative || !proposal.keys.length || proposal.keys.some((key) => !careerKeys.has(key) && key !== 'resumeText')) return null;
     if (proposal.keys.includes('resumeText') && !input.resumeText?.trim()) return null;
     if (proposal.keys.filter((key) => key !== 'resumeText').some((key) => { const fact = input.profile[key as keyof ResumeProfile]; return typeof fact === 'number' || !fact?.length; })) return null;
