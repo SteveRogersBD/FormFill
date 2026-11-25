@@ -104,6 +104,16 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
   }, [loaded]);
 
   useEffect(() => {
+    if (editing !== 'employment') return;
+    const target = window.location.hash.slice(1);
+    if (!target.startsWith('sa-')) return;
+    const field = document.getElementById(target);
+    const group = field?.closest('details');
+    if (group) group.open = true;
+    field?.scrollIntoView?.({ block: 'center' });
+  }, [editing]);
+
+  useEffect(() => {
     if (!loaded || typeof IntersectionObserver === 'undefined') return;
     const observer = new IntersectionObserver((entries) => {
       const visible = entries.find((entry) => entry.isIntersecting);
