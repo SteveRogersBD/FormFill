@@ -85,6 +85,42 @@ h2 { font-size: 1.18rem; line-height: 1.3; margin: 0; }
 .profile-supporting-details { margin-top: 23px; }
 .profile-supporting-details h3 { margin: 0 0 9px; font-size: .86rem; }
 .profile-supporting-details ul { padding-left: 18px; font-size: .75rem; line-height: 1.7; }
+.experience-timeline { padding-left: 23px; }
+.timeline-entry { position: relative; padding: 0 0 27px 0; overflow-wrap: anywhere; }
+.timeline-entry:last-child { padding-bottom: 0; }
+.timeline-entry::before { content: ''; position: absolute; top: 4px; left: -23px; width: 10px; height: 10px; border: 2px solid #344d3d; border-radius: 50%; background: white; z-index: 1; }
+.timeline-entry:not(:last-child)::after { content: ''; position: absolute; top: 16px; bottom: -4px; left: -18px; width: 1px; background: #b4e5bf; }
+.timeline-entry h3 { margin: 0 0 5px; color: #24372b; font-size: .95rem; font-weight: 650; }
+.timeline-date { margin: 0 0 13px; color: #959c97; font-size: .72rem; }
+.timeline-date span { margin: 0 5px; }
+.timeline-role { margin: 0 0 7px; font-size: .78rem; }
+.timeline-meta { margin: 0 0 7px; color: #8a958e; font-size: .71rem; }
+.timeline-summary, .timeline-entry li { font-size: .75rem; line-height: 1.7; }
+.timeline-summary { margin: 13px 0 4px; }
+.timeline-entry ul { padding-left: 16px; margin: 13px 0 0; }
+.timeline-entry li + li { margin-top: 6px; }
+.employment-intro { margin-bottom: 22px; color: #919a94; font-size: .74rem; line-height: 1.6; }
+.employment-questions { margin: 0; }
+.employment-question { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(140px, 1fr); gap: 35px; align-items: start; padding: 12px 0; font-size: .75rem; line-height: 1.6; }
+.employment-question dt { max-width: 510px; }
+.employment-question dd { margin: 0; }
+.answer-chip { display: inline-block; max-width: 100%; padding: 3px 7px; color: #375a44; background: #edf5ef; border-radius: 5px; overflow-wrap: anywhere; font-size: .72rem; }
+.answer-chip.not-provided { color: #939b96; background: #f3f4f5; }
+.voluntary-status { margin: 20px 0 0; color: #86938a; font-size: .7rem; }
+.dashboard-rail { display: grid; align-content: start; gap: 16px; padding-top: 42px; }
+.profile-readiness { padding: 22px 19px; background: #edf7e9; border: 1px solid #e4efdd; border-radius: 13px; }
+.readiness-icon { display: grid; place-items: center; width: 34px; height: 34px; margin-bottom: 17px; background: #daedbd; color: #466c31; border-radius: 50%; font-size: 1.1rem; }
+.profile-readiness h2 { max-width: 230px; font-size: 1.07rem; line-height: 1.4; }
+.profile-readiness p { margin: 12px 0; color: #839079; font-size: .73rem; line-height: 1.65; }
+.readiness-progress { height: 5px; margin-top: 22px; background: #dae9d4; border-radius: 10px; overflow: hidden; }
+.readiness-progress span { display: block; height: 100%; border-radius: inherit; background: #6ba04b; }
+.profile-readiness .readiness-count { margin: 7px 0 15px; font-size: .65rem; }
+.profile-readiness .button { font-size: .75rem; }
+.dashboard-rail .resume-card { padding: 18px; }
+.dashboard-rail h2 { font-size: .9rem; }
+.profile-shortcuts { padding: 4px 16px 14px; }
+.profile-shortcuts button { display: flex; justify-content: space-between; gap: 12px; width: 100%; padding: 16px 0; border: 0; border-bottom: 1px solid #f0f1f0; background: transparent; color: #4a5b4f; text-align: left; font-size: .72rem; }
+.profile-shortcuts p { margin: 12px 0 0; color: #98a199; font-size: .64rem; line-height: 1.65; }
 .welcome-row { display: flex; justify-content: space-between; align-items: end; margin-bottom: 29px; }
 .welcome-row .muted { margin-bottom: 0; font-size: .9rem; }
 .profile-status { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; color: #78857c; font-size: .75rem; }
