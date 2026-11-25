@@ -14,3 +14,14 @@ beforeEach(() => {
   mocks.setDoc.mockImplementation(async (path: string, value: Record<string, unknown>) => { documents.set(path, structuredClone(value)); });
   mocks.getDoc.mockImplementation(async (path: string) => ({ exists: () => documents.has(path), data: () => structuredClone(documents.get(path)) }));
 });
+
+describe('Equal Employment persistence', () => {
+  it('reads back every saved answer from the same per-user document', async () => {
+    const answers = { ...emptyPreferences(), workCountries: 'United States, Canada', usCitizen: 'no' as const, workAuthorized: 'yes' as const, sponsorshipNowOrFuture: 'yes' as const, lgbtqIdentity: 'decline' as const, eeoOptIn: false };
+    const saved = await savePreferences(answers, 'owner');
+    expect(mocks.setDoc).toHaveBeenCalledWith('users/owner/preferences/current', expect.objectContaining(answers));
+    expect(await loadPreferences('owner')).toEqual(saved);
+    expect(saved.updatedAt).toEqual(expect.any(Number));
+    expect(await loadPreferences('another-account')).toBeNull();
+  });
+});
