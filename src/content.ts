@@ -198,7 +198,7 @@ function scanChoiceGroups(startIndex: number): DetectedField[] {
       .filter((button) => {
         if (button instanceof HTMLButtonElement && (button.disabled || (button.form && button.type !== 'button'))) return false;
         const text = cleanLabelText(button.textContent);
-        return text.length > 0 && text.length <= 30;
+        return text.length > 0 && text.length <= 1000;
       });
     if (buttons.length < 2 || buttons.length > 200) continue;
     const label = questionTitle(group) || cleanLabelText(group.getAttribute('aria-label'))
@@ -239,7 +239,11 @@ async function scoutCustomOptions() {
   for (const element of document.querySelectorAll<HTMLElement>('[role="combobox"], [aria-autocomplete], button[aria-haspopup="listbox"]')) {
     if (element.matches(':disabled, [aria-disabled="true"]') || element.closest('[hidden], [aria-hidden="true"]') || (element instanceof HTMLButtonElement && element.form && element.type !== 'button')) continue;
     const wasOpen = element.getAttribute('aria-expanded') === 'true';
-    if (!wasOpen) element.click();
+    if (!wasOpen) {
+      element.focus();
+      element.click();
+      if (element.getAttribute('aria-expanded') !== 'true') element.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', bubbles: true }));
+    }
     const controlledId = element.getAttribute('aria-controls') || element.getAttribute('aria-owns');
     let options: HTMLElement[] = [];
     for (let attempt = 0; attempt < 4; attempt++) {
