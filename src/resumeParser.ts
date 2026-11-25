@@ -123,6 +123,21 @@ export function extractProfileFromText(text: string): ResumeProfile {
   return profile;
 }
 
+export async function extractResumeText(bytes: ArrayBuffer): Promise<string> {
+  const document = await pdfjs.getDocument({ data: bytes }).promise;
+  try {
+    const pages: string[] = [];
+    for (let pageNumber = 1; pageNumber <= document.numPages; pageNumber += 1) {
+      const page = await document.getPage(pageNumber);
+      const content = await page.getTextContent();
+      pages.push(content.items.map((item) => 'str' in item ? `${item.str}${'hasEOL' in item && item.hasEOL ? '\n' : ' '}` : '').join(''));
+    }
+    const text = pages.join('\n').trim();
+    if (!text) throw new Error('The saved resume has no selectable text. Paste its text into the application workspace.');
+    return text;
+  } finally { await document.destroy(); }
+}
+
 export async function extractProfile(file: File): Promise<ResumeProfile> {
   const bytes = await file.arrayBuffer();
   const document = await pdfjs.getDocument({ data: bytes }).promise;
