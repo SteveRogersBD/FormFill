@@ -22,6 +22,21 @@ export const workExperienceSchema = z.object({
 
 export type WorkExperience = z.infer<typeof workExperienceSchema>;
 
+export function normalizeWorkExperience(value: unknown): unknown {
+  if (!Array.isArray(value) || !value.every((item) => typeof item === 'string')) return value;
+  const entries: WorkExperience[] = [];
+  for (const [index, raw] of value.entries()) {
+    const line = raw.trim();
+    if (!line) continue;
+    const role = line.length <= 160 && !line.endsWith('.') && line.split(/\s+/).length <= 12
+      && !/^(led|built|worked|created|managed|designed|developed|drove|owned|shipped|delivered|launched|partnered|collaborated)\b/i.test(line)
+      ? line.match(/^(.+?)\s+at\s+(.+?)(?:\s*[·|]\s*.*)?$/i) : null;
+    if (role || !entries.length) entries.push(workExperienceSchema.parse({ id: `imported-${index}`, jobTitle: role?.[1] ?? '', company: role?.[2] ?? '' }));
+    if (!role) entries[entries.length - 1].description.push(line);
+  }
+  return entries;
+}
+
 export const resumeProfileSchema = z.object({
   fullName: z.string().max(200).default(''),
   email: z.string().max(320).default(''),
