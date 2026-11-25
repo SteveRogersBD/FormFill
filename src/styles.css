@@ -121,6 +121,43 @@ h2 { font-size: 1.18rem; line-height: 1.3; margin: 0; }
 .profile-shortcuts { padding: 4px 16px 14px; }
 .profile-shortcuts button { display: flex; justify-content: space-between; gap: 12px; width: 100%; padding: 16px 0; border: 0; border-bottom: 1px solid #f0f1f0; background: transparent; color: #4a5b4f; text-align: left; font-size: .72rem; }
 .profile-shortcuts p { margin: 12px 0 0; color: #98a199; font-size: .64rem; line-height: 1.65; }
+.profile-editor-backdrop { position: fixed; inset: 0; z-index: 30; display: flex; justify-content: flex-end; background: #101612a8; }
+.profile-editor { display: flex; flex-direction: column; width: min(760px, 100%); height: 100dvh; background: #fff; border-radius: 20px 0 0 20px; outline: 0; box-shadow: -20px 0 70px #0002; }
+.profile-editor-header { display: flex; align-items: center; gap: 16px; padding: 18px 22px; border-bottom: 1px solid #edf0ee; }
+.profile-editor-header h2 { font-size: 1rem; }
+.profile-editor-header > .button { margin-left: auto; min-height: 35px; padding: 0 22px; border-radius: 20px; }
+.drawer-close { width: 32px; height: 32px; background: white; border: 1px solid #e7ece8; border-radius: 8px; font-size: 1.3rem; }
+.editor-sync-note { margin: 0; padding: 11px 22px; color: #7d8b81; background: #f5f7f5; font-size: .68rem; line-height: 1.5; text-align: center; }
+.profile-editor-body { min-height: 0; flex: 1; padding: 30px 25px; overflow-y: auto; }
+.editor-fields { min-width: 0; margin: 0; padding: 0; border: 0; }
+.profile-editor .field-grid { gap: 22px 15px; }
+.profile-editor .form-field { font-size: .75rem; font-weight: 500; }
+.profile-editor .form-field input, .profile-editor .form-field select, .profile-editor .form-field textarea { width: 100%; min-width: 0; min-height: 42px; padding: 11px 12px; color: #23352a; background: #f5f6f7; border: 1px solid transparent; border-radius: 7px; font: inherit; font-size: .76rem; }
+.profile-editor :is(input, select, textarea):focus-visible { outline: 2px solid #76a77f; outline-offset: 2px; }
+.experience-editor-entry + .experience-editor-entry { margin-top: 30px; padding-top: 28px; border-top: 1px solid #ecefec; }
+.experience-editor-heading { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+.experience-editor-heading h3 { margin: 0; font-size: 1.07rem; }
+.form-field i { color: #c16359; font-style: normal; }
+.remove-entry { display: grid; place-items: center; width: 29px; height: 29px; border: 1px solid #e6eae6; border-radius: 50%; background: #fff; color: #89918c; font-size: 1rem; }
+.remove-entry:hover { color: #a54a3e; background: #fff5f2; }
+.current-role-choice { display: flex; align-items: center; gap: 7px; margin-top: 3px; font-size: .7rem; font-weight: 400; }
+.profile-editor .current-role-choice input { width: 16px; min-height: 16px; height: 16px; padding: 0; accent-color: #378454; }
+.description-editor { margin: 25px 0 30px; }
+.description-editor h4 { margin: 0 0 12px; font-size: .75rem; font-weight: 500; }
+.description-bullet { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 9px; padding: 9px 11px; background: #f5f6f7; border-radius: 7px; }
+.description-bullet > span { margin-top: 7px; color: #68856d; }
+.description-bullet textarea { width: 100%; resize: vertical; min-height: 46px; color: #334c3a; background: transparent; border: 0; font-size: .75rem; line-height: 1.6; }
+.description-bullet .remove-entry { flex-shrink: 0; width: 23px; height: 23px; border: 0; background: transparent; }
+.description-editor .button { min-height: 33px; padding: 0 10px; border: 1px solid #e9ede9; font-size: .72rem; }
+.editor-footer { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 30px; padding-top: 18px; border-top: 1px solid #ebefeb; }
+.profile-editor .standing-groups { margin-top: 0; }
+.profile-editor .standing-group { padding: 15px; }
+.profile-editor .standing-group summary { font-size: .83rem; }
+.profile-editor .standing-group .field-grid { grid-template-columns: 1fr; padding-top: 10px; gap: 18px; }
+.profile-editor .standing-group .span-two { grid-column: auto; }
+@media (max-width: 1250px) { .dashboard-content { grid-template-columns: minmax(0, 1fr) 240px; gap: 18px; padding: 24px 20px 50px; } .profile-tabs { gap: 21px; } .dashboard-shell { grid-template-columns: 175px minmax(0, 1fr); } .profile-overview { padding: 0 22px; } }
+@media (max-width: 1050px) { .dashboard-content { grid-template-columns: minmax(0, 1fr); } .dashboard-rail { grid-template-columns: repeat(2, minmax(0, 1fr)); padding-top: 0; } .profile-shortcuts { grid-column: 1 / -1; } }
+@media (max-width: 700px) { .dashboard-shell { display: block; } .dashboard-sidebar { position: static; height: auto; padding: 15px 16px 8px; border-right: 0; border-bottom: 1px solid #e9ebed; } .dashboard-sidebar .brand { margin: 0 0 12px; padding: 0; } .sidebar-label, .sidebar-account { display: none; } .dashboard-sidebar nav { display: flex; flex-wrap: wrap; gap: 4px; } .sidebar-link { font-size: .72rem; min-height: 35px; padding: 8px; } .sidebar-bottom { position: absolute; right: 14px; top: 13px; } .dashboard-workspace > .topbar { min-height: 72px; padding: 17px 18px; gap: 12px; } .profile-status { font-size: .65rem; margin: 0; } .dashboard-content { padding: 19px 12px 40px; gap: 18px; } .profile-privacy { font-size: .65rem; padding: 0 4px; } .profile-overview { padding: 0 18px; } .profile-tabs { gap: 23px; } .profile-tabs a { font-size: .71rem; } .profile-section { padding: 26px 0; } .personal-name { font-size: 1.22rem; } .employment-question { grid-template-columns: minmax(0, 1fr) minmax(88px, .65fr); gap: 17px; font-size: .7rem; } .answer-chip { font-size: .67rem; } .dashboard-rail { grid-template-columns: 1fr; } .profile-shortcuts { grid-column: auto; } .profile-editor { border-radius: 14px 0 0 14px; } .profile-editor-header { padding: 15px; gap: 10px; } .profile-editor-body { padding: 24px 17px; } .profile-editor .field-grid { grid-template-columns: 1fr; } .profile-editor .span-two { grid-column: auto; } .profile-editor .current-role-choice input { width: 16px; } .editor-footer { align-items: flex-start; } }
 .welcome-row { display: flex; justify-content: space-between; align-items: end; margin-bottom: 29px; }
 .welcome-row .muted { margin-bottom: 0; font-size: .9rem; }
 .profile-status { display: flex; align-items: center; gap: 8px; margin-bottom: 9px; color: #78857c; font-size: .75rem; }
