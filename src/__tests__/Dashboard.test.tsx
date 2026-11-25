@@ -23,6 +23,14 @@ beforeEach(() => {
   mocks.saveProfile.mockImplementation(async (profile) => ({ ...profile, updatedAt: 1 }));
 });
 
+async function renderDashboard() {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const host = document.createElement('div'); document.body.append(host);
+  const root = createRoot(host);
+  await act(async () => { root.render(<Dashboard user={{ uid: 'test-user' } as User} onLogout={async () => {}} />); });
+  return { host, root };
+}
+
 describe('dashboard work eligibility answers', () => {
   it('loads old profiles without guessing a combined answer, then saves the two requested answers', async () => {
     (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
