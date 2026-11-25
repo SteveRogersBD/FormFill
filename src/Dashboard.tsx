@@ -159,6 +159,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
   const section = PROFILE_SECTIONS.find((item) => item.id === editing);
   const sectionCompletion = [Boolean(profile.fullName && profile.email), Boolean(profile.university), profile.workExperience.some((entry) => entry.jobTitle && entry.company), Boolean(profile.skills.length), Boolean(preferences.workAuthorized && preferences.sponsorshipNowOrFuture)];
   const completeSections = sectionCompletion.filter(Boolean).length;
+  const nextIncompleteSection = PROFILE_SECTIONS.find((_, index) => !sectionCompletion[index]) ?? PROFILE_SECTIONS[0];
 
   return <div className="dashboard-shell">
     <aside className="dashboard-sidebar">
@@ -205,7 +206,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
       </section>
         </div>
         <aside className="dashboard-rail" aria-label="Profile tools">
-          <section className="profile-readiness"><span className="readiness-icon" aria-hidden="true">✦</span><h2>A little setup. A lot less repetition.</h2><p>Keep your details ready so you can focus on your next opportunity.</p><div className="readiness-progress" role="progressbar" aria-label="Profile sections completed" aria-valuemin={0} aria-valuemax={5} aria-valuenow={completeSections}><span style={{ width: `${completeSections * 20}%` }} /></div><p className="readiness-count">{completeSections} of 5 sections ready</p><button className="button primary wide" disabled={!loaded || working} onClick={() => openEditor(PROFILE_SECTIONS[completeSections === 5 ? 0 : sectionCompletion.findIndex((complete) => !complete)].id)}>{completeSections === 5 ? 'Review my profile' : 'Complete my profile'}</button></section>
+          <section className="profile-readiness"><span className="readiness-icon" aria-hidden="true">✦</span><h2>A little setup. A lot less repetition.</h2><p>Keep your details ready so you can focus on your next opportunity.</p><div className="readiness-progress" role="progressbar" aria-label="Profile sections completed" aria-valuemin={0} aria-valuemax={5} aria-valuenow={completeSections}><span style={{ width: `${completeSections * 20}%` }} /></div><p className="readiness-count">{completeSections} of 5 sections ready</p><button className="button primary wide" disabled={!loaded || working} onClick={() => openEditor(nextIncompleteSection.id)}>{completeSections === 5 ? 'Review my profile' : 'Complete my profile'}</button></section>
           <section className="card resume-card" id="resume"><div className="section-heading"><h2>Your resume</h2><span className="icon-badge" aria-hidden="true">↥</span></div>
             <label className="upload-zone"><input type="file" accept="application/pdf,.pdf" disabled={!loaded || working} onChange={chooseResume} /><span className="upload-icon" aria-hidden="true">↑</span><strong>{working ? 'Working…' : file ? file.name : 'Upload a PDF resume'}</strong><span className="muted small-text">Click to browse · up to 10 MB</span></label>
             {profile.resumePath && !file && <button className="text-button" onClick={openResume}>Open current resume ↗</button>}
