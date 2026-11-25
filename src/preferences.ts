@@ -194,6 +194,8 @@ export function emptyPreferences(): Preferences {
 
 export const PREFERENCE_FIELDS: PreferenceField[] = PREFERENCE_GROUPS.flatMap((group) => group.fields);
 
+export const EMPLOYMENT_OVERVIEW_KEYS: AnswerKey[] = ['workCountries', 'usCitizen', 'workAuthorized', 'sponsorshipNowOrFuture', 'visaStatus', 'disabilityStatus', 'lgbtqIdentity', 'gender', 'veteranStatus', 'raceEthnicity', 'hispanicLatino', 'sexualOrientation'];
+
 // Canonical values are stored short ('yes', 'decline') so one answer can be translated
 // into whatever wording each portal's options use. The wording table is shared with the
 // Python service, which stamps the same text into the answers it resolves.
