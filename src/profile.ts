@@ -1,5 +1,27 @@
 import { z } from 'zod';
 
+const experienceMonth = z.string().regex(/^$|^\d{4}-(0[1-9]|1[0-2])$/, 'Use a valid year and month.').default('');
+
+export const JOB_TYPES = ['Full-time', 'Part-time', 'Contract', 'Internship', 'Temporary', 'Freelance', 'Self-employed', 'Volunteer', 'Apprenticeship', 'Seasonal'] as const;
+
+export const workExperienceSchema = z.object({
+  id: z.string().min(1).max(100),
+  jobTitle: z.string().max(200).default(''),
+  company: z.string().max(200).default(''),
+  jobType: z.enum(['', ...JOB_TYPES]).default(''),
+  location: z.string().max(200).default(''),
+  startDate: experienceMonth,
+  endDate: experienceMonth,
+  current: z.boolean().default(false),
+  summary: z.string().max(2000).default(''),
+  description: z.array(z.string().max(2000)).max(100).default([]),
+}).strict().superRefine((entry, context) => {
+  if (!entry.current && entry.startDate && entry.endDate && entry.endDate < entry.startDate) context.addIssue({ code: 'custom', path: ['endDate'], message: 'End date must be on or after the start date.' });
+  if (entry.current && entry.endDate) context.addIssue({ code: 'custom', path: ['endDate'], message: 'A current role should not have an end date.' });
+});
+
+export type WorkExperience = z.infer<typeof workExperienceSchema>;
+
 export const resumeProfileSchema = z.object({
   fullName: z.string().max(200).default(''),
   email: z.string().max(320).default(''),
