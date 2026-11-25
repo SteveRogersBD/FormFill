@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { findProfileValue, isCoverLetterField, isSensitiveField } from '../fields';
-import { emptyProfile } from '../profile';
+import { emptyProfile, resumeProfileSchema } from '../profile';
 
-const profile = {
+const profile = resumeProfileSchema.parse({
   ...emptyProfile(),
   fullName: 'Jordan Lee',
   email: 'jordan@example.com',
@@ -13,7 +13,7 @@ const profile = {
   skills: ['TypeScript', 'React'],
   workExperience: ['Built reliable onboarding flows.'],
   targetRole: 'Product Designer',
-};
+});
 
 const detailedProfile = {
   ...profile,
