@@ -70,6 +70,8 @@ def _experience_text(entry: Any) -> str:
     context = " · ".join(str(entry.get(key) or "") for key in ("jobType", "location") if entry.get(key))
     dates = " – ".join(str(value) for value in (entry.get("startDate"), "Present" if entry.get("current") else entry.get("endDate")) if value)
     description = entry.get("description") or []
+    if not isinstance(description, list):
+        description = [description]
     return "\n".join(str(value) for value in (title, context, dates, entry.get("summary"), *description) if value)
 
 
