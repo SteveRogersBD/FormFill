@@ -8,7 +8,7 @@ import { emptyPreferences, PREFERENCE_FIELDS, type Preferences } from './prefere
 import { matchQuestion, questionAnswer } from './questions';
 import { firebaseAppCheckReady } from './firebase';
 import { completeJobContext, hostPermissionPattern, type ApplicationScan } from './applicationPage';
-import { applicationReadiness, clearWorkspace, loadWorkspace, saveWorkspace } from './applicationWorkspace';
+import { applicationReadiness, clearWorkspace, loadWorkspace, prepareFill, saveWorkspace } from './applicationWorkspace';
 
 async function getActiveApplicationTab() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -163,8 +163,13 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     try {
       // Standing answers are an enhancement: a missing rules deploy or a brand-new account
       // must not block the profile load, which scanning depends on.
-      const [savedProfile, records, savedPreferences] = await Promise.all([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid).catch(() => null)]);
-      setProfile(savedProfile ?? emptyProfile()); setApplications(records); setPreferences(savedPreferences ?? emptyPreferences());
+      const [savedProfile, records, savedPreferences] = await Promise.allSettled([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid)]);
+      if (savedProfile.status === 'rejected') throw savedProfile.reason;
+      setProfile(savedProfile.value ?? emptyProfile());
+      setApplications(records.status === 'fulfilled' ? records.value : []);
+      setPreferences(savedPreferences.status === 'fulfilled' ? savedPreferences.value ?? emptyPreferences() : emptyPreferences());
+      if (savedPreferences.status === 'rejected') setError('Saved standing answers could not be loaded. Your name and contact details are available; reload standing answers or enter those answers manually.');
+      else if (records.status === 'rejected') setError('Application history could not be loaded. Profile filling is still available.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not load your profile.'); }
     finally { setLoading(false); }
   }, [user.uid]);
@@ -226,7 +231,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         setNotice('The application is embedded on another site. Approve access to that site to scan its form.');
         return;
       }
-      const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid)]);
+      const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid).catch(() => { setError('Saved standing answers could not be loaded. Profile details are still available; enter missing standing answers manually.'); return null; })]);
       const currentProfile = latestProfile ?? emptyProfile();
       const currentPreferences = latestPreferences ?? emptyPreferences();
       setProfile(currentProfile); setPreferences(currentPreferences);
@@ -267,30 +272,27 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     } finally { setBusy(false); }
   };
 
-  const fillPage = async () => {
+  const fillPage = async (allowPartial = false) => {
     if (!scan) return;
     setBusy(true); setError('');
     try {
-      if (applicationReadiness(scan, plan, values, confirmed, manualDone, Boolean(profile.resumePath)).some((item) => item.blocking)) throw new Error('Complete and approve all required answers before filling. For manual controls, complete them on the page and mark them done below.');
+      if (!allowPartial && applicationReadiness(scan, plan, values, confirmed, manualDone, Boolean(profile.resumePath)).some((item) => item.blocking)) throw new Error('Some required answers are not ready. Review them, or choose “Fill prepared answers” to enter only the answers that are ready.');
       const tab = await getActiveApplicationTab();
       if (tab.url !== scan.url || tab.id !== scan.tabId) throw new Error('The active application tab changed. Return to the scanned tab or scan again before filling.');
       const fingerprint = (application: ApplicationScan) => JSON.stringify(application.fields.map(({ id, label, type, required, options, maxLength, min, max, pattern }) => ({ id, label, type, required, options: ['select', 'radio', 'choice'].includes(type) ? [...options].sort() : [], maxLength, min, max, pattern })));
       const before = await scanActivePage(tab.id);
-      if (!('scan' in before) || fingerprint(before.scan) !== fingerprint(scan)) {
-        setStale(true);
-        throw new Error('The application questions or options changed. Scan again to prepare the current form.');
-      }
+      if (!('scan' in before)) throw new Error('Site permission changed. Scan again to restore access before filling.');
+      const prepared = prepareFill(scan, before.scan, plan, values, confirmed);
       const valuesByFrame = new Map<number, Record<string, string>>();
-      for (const [id, value] of Object.entries(values)) {
-        const field = scan.fields.find((candidate) => candidate.id === id);
-        if (!field || !canPlan(field)
-          || !fitsControl(field, value) || ((needsConfirmation(field) || plan?.entries.find((entry) => entry.fieldId === id)?.requiresConfirmation) && !confirmed[id])) continue;
+      const originalIds = new Map<string, string>();
+      for (const { field, originalId, value } of prepared.targets) {
         const frameValues = valuesByFrame.get(field.frameId ?? 0) ?? {};
         frameValues[field.frameFieldId ?? field.id] = value;
         valuesByFrame.set(field.frameId ?? 0, frameValues);
+        originalIds.set(`frame-${field.frameId ?? 0}-${field.frameFieldId ?? field.id}`, originalId);
       }
       // Only the detected resume question receives the PDF; other uploads stay manual.
-      const resumeField = scan.fields.find((field) => field.type === 'file' && /\b(resume|cv|curriculum)\b/i.test(field.label));
+      const resumeField = before.scan.fields.find((field) => field.type === 'file' && /\b(resume|cv|curriculum)\b/i.test(field.label));
       let resume: { fieldId: string; data: string; name: string } | undefined;
       let resumeError = '';
       if (resumeField && profile.resumePath) {
@@ -298,6 +300,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         catch (reason) { resumeError = reason instanceof Error ? reason.message : 'Could not download your resume.'; }
       }
       if (resume && resumeField) valuesByFrame.set(resumeField.frameId ?? 0, valuesByFrame.get(resumeField.frameId ?? 0) ?? {});
+      if (!valuesByFrame.size) throw new Error('No prepared answer matches a current control. Scan again and review the field explanations.');
       const results = await Promise.all([...valuesByFrame].map(async ([frameId, frameValues]) => ({ frameId, result:
         await chrome.tabs.sendMessage(tab.id, {
           type: 'APPLYAI_FILL_FIELDS',
@@ -307,12 +310,12 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       ));
       const filledCount = results.reduce((total, { result }) => total + result.filled, 0);
       setFilled(filledCount > 0);
-      setOutcomes(Object.fromEntries(results.flatMap(({ frameId, result }) => Object.entries(result.outcomes ?? {}).map(([id, status]) => [`frame-${frameId}-${id}`, status]))));
+      setOutcomes(Object.fromEntries([...prepared.skipped.map(({ fieldId }) => [fieldId, 'failed'] as const), ...results.flatMap(({ frameId, result }) => Object.entries(result.outcomes ?? {}).map(([id, status]) => [originalIds.get(`frame-${frameId}-${id}`) ?? `frame-${frameId}-${id}`, status]))]));
       const failedCount = results.reduce((total, { result }) => total + (result.failed?.length ?? 0), 0);
-      if (failedCount || resumeError) setError([resumeError, failedCount ? `${failedCount} field(s) could not be filled, including any unmatched location option. Review the page and complete them manually.` : ''].filter(Boolean).join(' '));
+      if (failedCount || prepared.skipped.length || resumeError) setError([resumeError, failedCount ? `${failedCount} control(s) could not be verified. Review the field results below.` : '', prepared.skipped.length ? `${prepared.skipped.length} answer(s) were skipped because they need approval or their controls changed. Other prepared answers were still attempted.` : ''].filter(Boolean).join(' '));
       setNotice(filledCount ? `Verified ${filledCount} field${filledCount === 1 ? '' : 's'}. Check the application before continuing.` : 'No answers could be verified. Review the field results below.');
       const after = await scanActivePage(tab.id);
-      if (!('scan' in after) || fingerprint(after.scan) !== fingerprint(scan)) {
+      if (!('scan' in after) || fingerprint(after.scan) !== fingerprint(before.scan)) {
         setStale(true);
         setNotice('Filling revealed new or changed questions. Scan again to prepare the next application snapshot; your edits to matching questions will be kept.');
       }
@@ -361,6 +364,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const trackedApplication = scan ? applications.find((application) => application.url === scan.url) : undefined;
   const readiness = scan ? applicationReadiness(scan, plan, values, confirmed, manualDone, Boolean(profile.resumePath)) : [];
   const blockers = readiness.filter((item) => item.blocking).length;
+  const preparedCount = readiness.filter((item) => item.ready && scan?.fields.find((field) => field.id === item.fieldId && canPlan(field))).length;
 
   return <main className="panel-shell">
     <header className="panel-header"><a className="brand" href="dashboard.html" target="_blank"><span className="brand-mark small">A</span><span>apply<span className="brand-accent">ai</span></span></a><a className="button quiet compact" href="dashboard.html" target="_blank">{profile.updatedAt ? 'Edit profile' : 'Set up profile'}</a><button className="button quiet compact" onClick={async () => { await discard(); await onLogout(); }}>Sign out</button></header>
