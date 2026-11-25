@@ -83,6 +83,14 @@ async function scanActivePage(tabId: number): Promise<ScanAttempt> {
   };
 }
 
+async function rescanApplicationFrames(tabId: number, previous: ApplicationScan): Promise<ApplicationScan> {
+  const frameIds = [...new Set(previous.fields.map((field) => field.frameId ?? 0))];
+  const results = await Promise.allSettled(frameIds.map(async (frameId) => ({ frameId, scan: await scanFrame(tabId, frameId) })));
+  const frames = results.flatMap((result) => result.status === 'fulfilled' ? [result.value] : []);
+  if (!frames.length) throw new Error('Could not reach the scanned application frames. Refresh the application page and scan again.');
+  return { ...previous, fields: frames.flatMap(({ frameId, scan }) => scan.fields.map((field) => ({ ...field, id: `frame-${frameId}-${field.id}`, frameId, frameFieldId: field.id }))) };
+}
+
 export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Promise<void> }) {
   const [profile, setProfile] = useState<ResumeProfile>(emptyProfile());
   const [preferences, setPreferences] = useState<Preferences>(emptyPreferences());
@@ -280,9 +288,8 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       const tab = await getActiveApplicationTab();
       if (tab.url !== scan.url || tab.id !== scan.tabId) throw new Error('The active application tab changed. Return to the scanned tab or scan again before filling.');
       const fingerprint = (application: ApplicationScan) => JSON.stringify(application.fields.map(({ id, label, type, required, options, maxLength, min, max, pattern }) => ({ id, label, type, required, options: ['select', 'radio', 'choice'].includes(type) ? [...options].sort() : [], maxLength, min, max, pattern })));
-      const before = await scanActivePage(tab.id);
-      if (!('scan' in before)) throw new Error('Site permission changed. Scan again to restore access before filling.');
-      const prepared = prepareFill(scan, before.scan, plan, values, confirmed);
+      const before = await rescanApplicationFrames(tab.id, scan);
+      const prepared = prepareFill(scan, before, plan, values, confirmed);
       const valuesByFrame = new Map<number, Record<string, string>>();
       const originalIds = new Map<string, string>();
       for (const { field, originalId, value } of prepared.targets) {
@@ -292,7 +299,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         originalIds.set(`frame-${field.frameId ?? 0}-${field.frameFieldId ?? field.id}`, originalId);
       }
       // Only the detected resume question receives the PDF; other uploads stay manual.
-      const resumeField = before.scan.fields.find((field) => field.type === 'file' && /\b(resume|cv|curriculum)\b/i.test(field.label));
+      const resumeField = before.fields.find((field) => field.type === 'file' && /\b(resume|cv|curriculum)\b/i.test(field.label));
       let resume: { fieldId: string; data: string; name: string } | undefined;
       let resumeError = '';
       if (resumeField && profile.resumePath) {
@@ -314,8 +321,8 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       const failedCount = results.reduce((total, { result }) => total + (result.failed?.length ?? 0), 0);
       if (failedCount || prepared.skipped.length || resumeError) setError([resumeError, failedCount ? `${failedCount} control(s) could not be verified. Review the field results below.` : '', prepared.skipped.length ? `${prepared.skipped.length} answer(s) were skipped because they need approval or their controls changed. Other prepared answers were still attempted.` : ''].filter(Boolean).join(' '));
       setNotice(filledCount ? `Verified ${filledCount} field${filledCount === 1 ? '' : 's'}. Check the application before continuing.` : 'No answers could be verified. Review the field results below.');
-      const after = await scanActivePage(tab.id);
-      if (!('scan' in after) || fingerprint(after.scan) !== fingerprint(before.scan)) {
+      const after = await rescanApplicationFrames(tab.id, before);
+      if (fingerprint(after) !== fingerprint(before)) {
         setStale(true);
         setNotice('Filling revealed new or changed questions. Scan again to prepare the next application snapshot; your edits to matching questions will be kept.');
       }
