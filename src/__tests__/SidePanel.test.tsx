@@ -104,13 +104,15 @@ describe('AI side panel workflow', () => {
     expect(mocks.plan).toHaveBeenCalledOnce();
   });
 
-  it('refuses to fill a changed form before any page mutation', async () => {
+  it('fills unchanged questions when a different field disappears', async () => {
     await act(async () => button('Scan and analyze with AI').click());
     await act(async () => (host.querySelector('.confirm-sensitive input') as HTMLInputElement).click());
-    mocks.message.mockResolvedValue({ ...application, fields: application.fields.slice(1) });
+    mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => message.type === 'APPLYAI_SCAN_FIELDS' ? { ...application, fields: application.fields.slice(1) } : { filled: 1, failed: [] });
     await act(async () => button('Fill reviewed answers').click());
-    expect(mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS')).toHaveLength(0);
-    expect(host.textContent).toContain('questions or options changed');
+    const calls = mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS');
+    expect(calls).toHaveLength(1);
+    expect(calls[0][1].values).toEqual({ b: 'No' });
+    expect(host.textContent).toContain('1 answer(s) were skipped');
   });
   it('analyzes the scan, displays provenance, and preserves edits when approved cloud fallback is rerun', async () => {
     await act(async () => button('Scan and analyze with AI').click());
