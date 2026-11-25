@@ -51,6 +51,8 @@ describe('findProfileValue', () => {
   });
 
   it('matches location, education, and current-role facts', () => {
+    expect(findProfileValue('Street address', { ...detailedProfile, streetAddress: '123 Example St' })).toBe('123 Example St');
+    expect(findProfileValue('GPA', { ...detailedProfile, gpa: '3.8 / 4.0' })).toBe('3.8 / 4.0');
     expect(findProfileValue('Location', detailedProfile)).toBe('San Francisco, CA, United States');
     expect(findProfileValue('ZipCode', detailedProfile)).toBe('94103');
     expect(findProfileValue('Linked In profile', detailedProfile)).toBe('https://linkedin.com/in/jordan-lee');
