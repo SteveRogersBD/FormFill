@@ -1,5 +1,18 @@
 [
   {
+    "id": "sponsorshipNowOrFuture",
+    "label": "Will you now or in the future require employer sponsorship?",
+    "fieldType": "yesno",
+    "answerFrom": "preferences",
+    "prefKey": "sponsorshipNowOrFuture",
+    "sensitivity": "consequential",
+    "patterns": [
+      "\\b(now|currently|present)\\b.{0,45}\\b(future|later|eventually)\\b.{0,160}\\b(sponsor\\w*|immigration case)\\b",
+      "\\bsponsor\\w*\\b.{0,100}\\b(now|currently|present)\\b.{0,45}\\b(future|later|eventually)\\b"
+    ],
+    "negative": ["\\bwithout\\b", "\\bhistory\\b", "\\bmanager\\b", "\\bevent\\b"]
+  },
+  {
     "id": "sponsorshipFuture",
     "label": "Will you require sponsorship in the future?",
     "fieldType": "yesno",
