@@ -61,7 +61,7 @@ describe('complete contact autofill integration', () => {
     const scan = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Scan and analyze with AI')!;
     await act(async () => scan.click());
     const partial = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Fill prepared answers')!;
-    expect(partial).toBeTruthy(); expect(partial.disabled).toBe(false);
+    expect(partial).toBeTruthy(); expect(partial.disabled, panel.textContent ?? '').toBe(false);
     await act(async () => partial.click());
     const accepted = JSON.parse(job.querySelector('output')!.textContent!);
     expect(accepted).toMatchObject({ 'Full name': 'Riley Example', 'First name': 'Riley', 'Last name': 'Example', Email: 'riley@example.test', Phone: '+15550101234', 'Zip code': '60601', LinkedIn: 'https://linkedin.com/in/riley-example' });
