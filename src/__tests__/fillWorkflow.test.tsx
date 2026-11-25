@@ -8,6 +8,8 @@ import { emptyProfile } from '../profile';
 import { emptyPreferences } from '../preferences';
 import { SidePanel } from '../SidePanel';
 
+const modelWork = vi.hoisted(() => ({ current: null as Promise<unknown> | null }));
+
 vi.mock('../firebase', () => ({ firebaseAppCheckReady: false }));
 vi.mock('../data', () => ({
   loadProfile: async () => ({ ...emptyProfile(), updatedAt: 1, fullName: 'Riley Example', email: 'riley@example.test', phone: '+15550101234', postalCode: '60601', linkedin: 'https://linkedin.com/in/riley-example' }),
@@ -15,7 +17,7 @@ vi.mock('../data', () => ({
 }));
 vi.mock('../plannerModel', async () => {
   const { runPlanner } = await import('../plannerGraph');
-  return { planApplication: (input: Parameters<typeof runPlanner>[0]) => runPlanner(input, { prepareDevice: async () => false, device: vi.fn(), cloud: vi.fn() }) };
+  return { planApplication: (input: Parameters<typeof runPlanner>[0]) => { modelWork.current = runPlanner(input, { prepareDevice: async () => false, device: vi.fn(), cloud: vi.fn() }); return modelWork.current; } };
 });
 
 const roots: Root[] = [];
@@ -60,6 +62,7 @@ describe('complete contact autofill integration', () => {
     await act(async () => { jobRoot.render(<ControlledApplication />); panelRoot.render(<SidePanel user={{ uid: 'fixture-user' } as User} onLogout={async () => {}} />); });
     const scan = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Scan and analyze with AI')!;
     await act(async () => scan.click());
+    await act(async () => { await vi.waitFor(() => expect(modelWork.current).toBeTruthy()); await modelWork.current; });
     const partial = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Fill prepared answers')!;
     expect(partial).toBeTruthy(); expect(partial.disabled, panel.textContent ?? '').toBe(false);
     await act(async () => partial.click());
