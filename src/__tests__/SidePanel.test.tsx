@@ -9,13 +9,13 @@ import { emptyPreferences } from '../preferences';
 import { SidePanel } from '../SidePanel';
 
 const mocks = vi.hoisted(() => ({ profile: vi.fn(), preferences: vi.fn(), plan: vi.fn(), message: vi.fn() }));
-vi.mock('../data', () => ({ loadProfile: mocks.profile, loadPreferences: mocks.preferences, listApplications: async () => [], getResumeAttachment: vi.fn(), saveApplication: vi.fn(), updateApplication: vi.fn() }));
+vi.mock('../data', () => ({ loadProfile: mocks.profile, loadPreferences: mocks.preferences, listApplications: async () => [], getResumeText: async () => 'Full resume text', getResumeAttachment: vi.fn(), saveApplication: vi.fn(), updateApplication: vi.fn() }));
 vi.mock('../firebase', () => ({ firebaseAppCheckReady: true }));
 vi.mock('../plannerModel', () => ({ planApplication: mocks.plan }));
 
 let root: Root;
 let host: HTMLDivElement;
-const application = { title: 'Engineer', role: 'Engineer', company: 'Example', url: 'https://jobs.example.com/apply', platform: 'standard', fields: [
+const application = { title: 'Engineer', role: 'Engineer', company: 'Example', description: 'Entire job description with requirements.', url: 'https://jobs.example.com/apply', platform: 'standard', fields: [
   { id: 'a', label: 'Preferred setup', type: 'choice', required: true, options: ['Remote', 'Hybrid'], selector: '', description: 'Choose your preferred arrangement.' },
   { id: 'b', label: 'Will you require sponsorship?', type: 'radio', required: true, options: ['Yes', 'No'], selector: '' },
 ] };
@@ -33,7 +33,7 @@ beforeEach(async () => {
   mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => message.type === 'APPLYAI_SCAN_FIELDS' ? application : { filled: 1, failed: [] });
   vi.stubGlobal('chrome', {
     tabs: { query: async () => [{ id: 1, url: application.url }], sendMessage: mocks.message },
-    storage: { session: { get: async () => ({}) } }, permissions: { contains: async () => true },
+    storage: { session: { get: async () => ({}), set: async () => {}, remove: async () => {} } }, permissions: { contains: async () => true },
     scripting: { executeScript: async () => [{ frameId: 0 }] },
   });
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
@@ -59,15 +59,16 @@ describe('AI side panel workflow', () => {
     expect(mocks.profile).toHaveBeenCalledTimes(3); // initial load, scan, reanalysis
   });
 
-  it('withholds an unapproved sensitive answer and sends it only after review', async () => {
+  it('blocks all filling until required sensitive answers are reviewed', async () => {
     await act(async () => button('Scan and analyze with AI').click());
     await act(async () => button('Fill reviewed answers').click());
     let calls = mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS');
-    expect(calls[0][1].values).toEqual({ a: 'Remote' });
+    expect(calls).toHaveLength(0);
+    expect(button('Fill reviewed answers').disabled).toBe(true);
     const approval = host.querySelector('.confirm-sensitive input') as HTMLInputElement;
     await act(async () => approval.click());
     await act(async () => button('Fill reviewed answers').click());
     calls = mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS');
-    expect(calls[1][1].values).toEqual({ a: 'Remote', b: 'No' });
+    expect(calls[0][1].values).toEqual({ a: 'Remote', b: 'No' });
   });
 });
