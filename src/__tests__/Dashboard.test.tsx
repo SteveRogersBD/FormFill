@@ -24,6 +24,7 @@ describe('dashboard work eligibility answers', () => {
     const root = createRoot(host);
     try {
       await act(async () => { root.render(<Dashboard user={{ uid: 'test-user' } as User} onLogout={async () => {}} />); });
+      await act(async () => { (host.querySelector('[aria-label="Edit Equal Employment"]') as HTMLButtonElement).click(); });
       const authorized = host.querySelector('#sa-workAuthorized select') as HTMLSelectElement;
       const combined = host.querySelector('#sa-sponsorshipNowOrFuture select') as HTMLSelectElement;
       expect(host.querySelector('#sa-workAuthorized')!.textContent).toContain('Are you authorized to work lawfully in the country for the position in which you are applying?');
@@ -31,8 +32,7 @@ describe('dashboard work eligibility answers', () => {
       expect(combined.value).toBe('');
       expect([...combined.options].map((option) => option.value)).toEqual(['', 'yes', 'no', 'unsure']);
       await act(async () => { authorized.value = 'yes'; Simulate.change(authorized); combined.value = 'yes'; Simulate.change(combined); });
-      const save = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Save standing answers')!;
-      await act(async () => save.click());
+      await act(async () => { Simulate.submit(host.querySelector('form')!); });
       expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({ workAuthorized: 'yes', sponsorshipNowOrFuture: 'yes', requiresSponsorship: 'no', sponsorshipFuture: 'yes' }), 'test-user');
       expect(host.textContent).toContain('Standing answers saved.');
       expect(emptyPreferences().sponsorshipNowOrFuture).toBe('');
