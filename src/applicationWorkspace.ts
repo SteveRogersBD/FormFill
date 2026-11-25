@@ -45,3 +45,11 @@ export async function loadWorkspace(uid: string): Promise<ApplicationWorkspace |
   if (!parsed.success || parsed.data.uid !== uid) return null;
   return parsed.data;
 }
+
+export function clearWorkspace(uid: string): Promise<void> {
+  const clearing = writes.catch(() => undefined).then(async () => {
+    await chrome.storage.session.remove(`applyAiWorkspace:${uid}`);
+  });
+  writes = clearing;
+  return clearing;
+}
