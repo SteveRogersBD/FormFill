@@ -307,7 +307,15 @@ async function pickListOption(element: HTMLElement, value: string) {
     });
     const option = options.find((item) => wanted.has(normalizeOption(item.textContent ?? '')))
       ?? (locations.length === 1 ? locations[0] : undefined);
-    if (option) { option.click(); return true; }
+    if (option) {
+      const offered = cleanLabelText(option.textContent);
+      option.click();
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const selected = option.getAttribute('aria-selected') === 'true';
+      const displayed = element instanceof HTMLInputElement ? element.value : cleanLabelText(element.textContent);
+      const closed = element.getAttribute('aria-expanded') === 'false' || !option.isConnected;
+      return selected || (closed && (wanted.has(normalizeOption(displayed)) || normalizeOption(displayed) === normalizeOption(offered)));
+    }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
   return false;
@@ -326,6 +334,7 @@ async function attachResume(element: HTMLInputElement, data: string, name: strin
 async function fillFields(values: Record<string, string>, resume?: { fieldId: string; data: string; name: string }) {
   let filled = 0;
   const failed: string[] = [];
+  const checks = new Map<string, () => boolean>();
   for (const [id, value] of Object.entries(values)) {
     const before = filled;
     try {
@@ -337,6 +346,7 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
         const choice = elements.find((element) => wanted.has(normalizeOption(element.textContent ?? '')));
         if (!choice || (choice instanceof HTMLButtonElement && choice.form && choice.type !== 'button')) continue;
         choice.click();
+        checks.set(id, () => choice.isConnected && (choice.getAttribute('aria-pressed') === 'true' || choice.getAttribute('aria-checked') === 'true'));
         filled += 1;
         continue;
       }
@@ -346,39 +356,56 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
         if (!(selected instanceof HTMLInputElement)) continue;
         selected.click();
         if (!selected.checked) continue;
+        checks.set(id, () => selected.isConnected && selected.checked && selected.getAttribute('aria-invalid') !== 'true');
         filled += 1;
         continue;
       }
       if (first instanceof HTMLInputElement && first.type === 'checkbox') {
-        if (value !== 'true') continue;
-        if (!first.checked) first.click();
-        if (!first.checked) continue;
+        if (!['true', 'false'].includes(value)) continue;
+        if (first.checked !== (value === 'true')) first.click();
+        checks.set(id, () => first.isConnected && first.checked === (value === 'true') && first.checkValidity());
         filled += 1;
         continue;
       }
       if (first instanceof HTMLSelectElement && first.multiple) continue;
       if (first instanceof HTMLInputElement && ['file', 'password'].includes(first.type)) continue;
       if (first instanceof HTMLInputElement && first.type === 'number' && !/^-?\d+(?:\.\d+)?$/.test(value.trim())) continue;
+      let expected = value;
       if (first instanceof HTMLSelectElement) {
         const option = findOption([...first.options].filter((item) => item.value), value);
         if (!option) continue;
         setValue(first, option.value);
+        expected = option.value;
       } else if (first instanceof HTMLInputElement && first.type === 'date') {
         const date = dateValue(value);
         if (!date) continue;
         setValue(first, date);
+        expected = date;
       } else if (first instanceof HTMLInputElement && first.type === 'month') {
         const month = monthValue(value);
         if (!month) continue;
         setValue(first, month);
+        expected = month;
       } else if (first instanceof HTMLInputElement && first.type === 'url' && !/^https?:\/\//i.test(value)) {
         continue;
       } else if (first instanceof HTMLInputElement || first instanceof HTMLTextAreaElement || first instanceof HTMLSelectElement) {
         first.focus();
         setValue(first, value);
         if ((first.getAttribute('role') === 'combobox' || first.hasAttribute('aria-autocomplete')) && !await pickListOption(first, value)) continue;
+        expected = first.value;
+      } else if (first.getAttribute('role') === 'combobox' || first.getAttribute('aria-haspopup') === 'listbox') {
+        first.click();
+        if (!await pickListOption(first, value)) continue;
+        checks.set(id, () => first.isConnected && first.getAttribute('aria-invalid') !== 'true' && (first.getAttribute('aria-expanded') === 'false' || cleanLabelText(first.textContent) === value));
+        filled += 1;
+        continue;
       } else {
         continue;
+      }
+      if (first instanceof HTMLInputElement || first instanceof HTMLTextAreaElement || first instanceof HTMLSelectElement) {
+        // Read again after all handlers have run, including asynchronous resets.
+        const control = first;
+        checks.set(id, () => control.isConnected && control.value === expected && control.getAttribute('aria-invalid') !== 'true' && control.checkValidity());
       }
       filled += 1;
     } catch {
@@ -387,6 +414,10 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
       if (filled === before) failed.push(id);
     }
   }
+  await new Promise((resolve) => setTimeout(resolve, 150));
+  for (const [id, verify] of checks) {
+    if (!verify() && !failed.includes(id)) { filled -= 1; failed.push(id); }
+  }
   if (resume) {
     try {
       const field = document.querySelector<HTMLInputElement>(`[data-applyai-field="${CSS.escape(resume.fieldId)}"]`);
@@ -394,7 +425,7 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
       else failed.push(resume.fieldId);
     } catch { failed.push(resume.fieldId); }
   }
-  return { filled, failed };
+  return { filled, failed, outcomes: Object.fromEntries(Object.keys(values).map((id) => [id, failed.includes(id) ? 'failed' : 'verified'])) };
 }
 
 const contentWorld = globalThis as typeof globalThis & { __applyAiPageListenerInstalled?: boolean };
