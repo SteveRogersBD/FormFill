@@ -19,6 +19,17 @@ vi.mock('../plannerModel', async () => {
 });
 
 const roots: Root[] = [];
+
+function ControlledApplication() {
+  const [values, setValues] = useState<Record<string, string>>({});
+  return <form onSubmit={(event) => { event.preventDefault(); throw new Error('Autofill must never submit.'); }}>
+    <div data-job-description>Build test and automation tools using TypeScript. This is fixture job context.</div>
+    {[['Full name', 'text'], ['First name', 'text'], ['Last name', 'text'], ['Email', 'email'], ['Phone', 'tel'], ['Zip code', 'text'], ['LinkedIn', 'url']].map(([label, type]) => <div className="ashby-application-form-field-entry" key={label}><label className="ashby-application-form-question-title" htmlFor={label}>{label}</label><input id={label} type={type} required value={values[label] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [label]: event.target.value }))} /></div>)}
+    <label htmlFor="essay">Why are you interested?</label><textarea id="essay" required value={values.essay ?? ''} onChange={(event) => setValues((current) => ({ ...current, essay: event.target.value }))} />
+    <button type="submit">Submit application</button>
+    <output aria-label="Accepted application values">{JSON.stringify(values)}</output>
+  </form>;
+}
 afterEach(async () => {
   await act(async () => { roots.splice(0).forEach((root) => root.unmount()); });
   document.body.innerHTML = ''; vi.unstubAllGlobals();
