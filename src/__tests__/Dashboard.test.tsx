@@ -31,7 +31,26 @@ async function renderDashboard() {
   return { host, root };
 }
 
-describe('dashboard work eligibility answers', () => {
+describe('dashboard profile editors', () => {
+  it('exposes the reference employment questions and saves new answers without enabling sharing', async () => {
+    mocks.save.mockImplementation(async (answers) => ({ ...answers, updatedAt: 1 }));
+    const { host, root } = await renderDashboard();
+    try {
+      expect(host.querySelectorAll('.employment-question')).toHaveLength(12);
+      expect(host.querySelector('#employment')!.textContent).toContain('Do you identify as LGBTQ+?');
+      await act(async () => (host.querySelector('[aria-label="Edit Equal Employment"]') as HTMLButtonElement).click());
+      const countries = host.querySelector<HTMLInputElement>('#sa-workCountries input')!;
+      const citizen = host.querySelector<HTMLSelectElement>('#sa-usCitizen select')!;
+      const identity = host.querySelector<HTMLSelectElement>('#sa-lgbtqIdentity select')!;
+      await act(async () => { countries.value = 'United States, Canada'; Simulate.change(countries); });
+      await act(async () => { citizen.value = 'no'; Simulate.change(citizen); });
+      await act(async () => { identity.value = 'decline'; Simulate.change(identity); });
+      await act(async () => Simulate.submit(host.querySelector('form')!));
+      expect(mocks.save).toHaveBeenCalledWith(expect.objectContaining({ workCountries: 'United States, Canada', usCitizen: 'no', lgbtqIdentity: 'decline', eeoOptIn: false }), 'test-user');
+      expect(host.querySelector('#employment')!.textContent).toContain('United States, Canada');
+      expect(host.querySelector('.voluntary-status')!.textContent).toContain('Off');
+    } finally { await act(async () => root.unmount()); host.remove(); }
+  });
   it('retains editor drafts when saving fails and prevents reversed work dates', async () => {
     mocks.loadProfile.mockResolvedValue(resumeProfileSchema.parse({ workExperience: [workExperienceSchema.parse({ id: 'role-1', jobTitle: 'Engineer', company: 'Example', startDate: '2024-06', endDate: '2024-08' })] }));
     const { host, root } = await renderDashboard();
