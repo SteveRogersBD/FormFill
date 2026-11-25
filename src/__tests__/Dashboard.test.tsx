@@ -32,6 +32,18 @@ async function renderDashboard() {
 }
 
 describe('dashboard profile editors', () => {
+  it('blocks edits if existing preferences cannot be loaded', async () => {
+    mocks.loadPreferences.mockRejectedValueOnce(new Error('Permission denied while loading existing answers.'));
+    const { host, root } = await renderDashboard();
+    try {
+      expect(host.querySelector('[role="alert"]')!.textContent).toContain('Permission denied');
+      const edit = host.querySelector<HTMLButtonElement>('[aria-label="Edit Equal Employment"]')!;
+      expect(edit.disabled).toBe(true);
+      await act(async () => edit.click());
+      expect(host.querySelector('[role="dialog"]')).toBeNull();
+      expect(mocks.save).not.toHaveBeenCalled();
+    } finally { await act(async () => root.unmount()); host.remove(); }
+  });
   it('exposes the reference employment questions and saves new answers without enabling sharing', async () => {
     mocks.save.mockImplementation(async (answers) => ({ ...answers, updatedAt: 1 }));
     const { host, root } = await renderDashboard();
