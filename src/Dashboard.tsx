@@ -103,6 +103,16 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
     // Deep links apply once when data loads; normal editor actions manage later drafts.
   }, [loaded]);
 
+  useEffect(() => {
+    if (!loaded || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver((entries) => {
+      const visible = entries.find((entry) => entry.isIntersecting);
+      if (visible) setActiveSection(visible.target.id);
+    }, { rootMargin: '-65px 0px -65% 0px' });
+    document.querySelectorAll('.profile-section').forEach((element) => observer.observe(element));
+    return () => observer.disconnect();
+  }, [loaded]);
+
   const save = async () => {
     setWorking(true); setError(''); setMessage('');
     try {
