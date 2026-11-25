@@ -16,6 +16,16 @@ beforeEach(() => {
 });
 
 describe('Equal Employment persistence', () => {
+  it('does not acknowledge a save before Firestore acknowledges the write', async () => {
+    let acknowledge!: () => void;
+    mocks.setDoc.mockImplementationOnce(() => new Promise<void>((resolve) => { acknowledge = resolve; }));
+    let completed = false;
+    const saving = savePreferences(emptyPreferences(), 'owner').then(() => { completed = true; });
+    await vi.waitFor(() => expect(mocks.setDoc).toHaveBeenCalledOnce());
+    expect(completed).toBe(false);
+    acknowledge(); await saving;
+    expect(completed).toBe(true);
+  });
   it('reads back every saved answer from the same per-user document', async () => {
     const answers = { ...emptyPreferences(), workCountries: 'United States, Canada', usCitizen: 'no' as const, workAuthorized: 'yes' as const, sponsorshipNowOrFuture: 'yes' as const, lgbtqIdentity: 'decline' as const, eeoOptIn: false };
     const saved = await savePreferences(answers, 'owner');
