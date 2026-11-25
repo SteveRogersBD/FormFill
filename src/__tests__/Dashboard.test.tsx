@@ -2,19 +2,26 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Simulate } from 'react-dom/test-utils';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { User } from 'firebase/auth';
 import { Dashboard } from '../Dashboard';
 import { emptyPreferences, preferencesSchema } from '../preferences';
-import { emptyProfile } from '../profile';
+import { emptyProfile, resumeProfileSchema, workExperienceSchema } from '../profile';
 
-const mocks = vi.hoisted(() => ({ save: vi.fn() }));
+const mocks = vi.hoisted(() => ({ save: vi.fn(), loadProfile: vi.fn(), loadPreferences: vi.fn(), saveProfile: vi.fn() }));
 vi.mock('../data', () => ({
-  loadProfile: async () => emptyProfile(), listApplications: async () => [],
-  loadPreferences: async () => preferencesSchema.parse({ requiresSponsorship: 'no', sponsorshipFuture: 'yes' }),
-  savePreferences: mocks.save, saveProfile: vi.fn(), saveResume: vi.fn(),
+  loadProfile: mocks.loadProfile, listApplications: async () => [],
+  loadPreferences: mocks.loadPreferences,
+  savePreferences: mocks.save, saveProfile: mocks.saveProfile, saveResume: vi.fn(),
   deleteApplication: vi.fn(), getResumeUrl: vi.fn(), updateApplication: vi.fn(),
 }));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  mocks.loadProfile.mockResolvedValue(emptyProfile());
+  mocks.loadPreferences.mockResolvedValue(preferencesSchema.parse({ requiresSponsorship: 'no', sponsorshipFuture: 'yes' }));
+  mocks.saveProfile.mockImplementation(async (profile) => ({ ...profile, updatedAt: 1 }));
+});
 
 describe('dashboard work eligibility answers', () => {
   it('loads old profiles without guessing a combined answer, then saves the two requested answers', async () => {
