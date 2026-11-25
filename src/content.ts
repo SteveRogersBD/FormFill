@@ -235,6 +235,28 @@ function applicationFrameOrigins(): string[] {
   }))];
 }
 
+async function scoutCustomOptions() {
+  for (const element of document.querySelectorAll<HTMLElement>('[role="combobox"], [aria-autocomplete], button[aria-haspopup="listbox"]')) {
+    if (element.matches(':disabled, [aria-disabled="true"]') || element.closest('[hidden], [aria-hidden="true"]') || (element instanceof HTMLButtonElement && element.form && element.type !== 'button')) continue;
+    const wasOpen = element.getAttribute('aria-expanded') === 'true';
+    element.click();
+    const controlledId = element.getAttribute('aria-controls') || element.getAttribute('aria-owns');
+    let options: HTMLElement[] = [];
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const scope = controlledId ? document.getElementById(controlledId) : element.closest(questionContainer) ?? document;
+      options = [...(scope ?? document).querySelectorAll<HTMLElement>('[role="option"]')].filter((option) => option.getAttribute('aria-disabled') !== 'true');
+      if (options.length) break;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    }
+    element.setAttribute('data-applyai-options', JSON.stringify(options.map((option) => cleanLabelText(option.textContent)).filter(Boolean)));
+    element.setAttribute('data-applyai-current', cleanLabelText(options.find((option) => option.getAttribute('aria-selected') === 'true')?.textContent));
+    if (!wasOpen) {
+      element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      element.blur();
+    }
+  }
+}
+
 function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
   const setter = element instanceof HTMLInputElement ? HTMLInputElement.prototype : element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLSelectElement.prototype;
   Object.getOwnPropertyDescriptor(setter, 'value')?.set?.call(element, value);
