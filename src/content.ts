@@ -257,6 +257,30 @@ async function scoutCustomOptions() {
   }
 }
 
+function jobContext() {
+  let description = document.querySelector('.ashby-job-posting-description, #content .content, [data-job-description], .posting-description, [itemprop="description"]')?.textContent?.trim() ?? '';
+  let company = '';
+  let role = '';
+  const queue: unknown[] = [...document.querySelectorAll('script[type="application/ld+json"]')].flatMap((script) => { try { return [JSON.parse(script.textContent ?? '')]; } catch { return []; } });
+  while (queue.length) {
+    const item = queue.shift();
+    if (Array.isArray(item)) { queue.push(...item); continue; }
+    if (!item || typeof item !== 'object') continue;
+    const object = item as Record<string, unknown>;
+    if ([object['@type']].flat().includes('JobPosting')) {
+      if (!description && typeof object.description === 'string') description = new DOMParser().parseFromString(object.description, 'text/html').body.textContent?.trim() ?? '';
+      role = typeof object.title === 'string' ? object.title : '';
+      const organization = object.hiringOrganization as { name?: string } | undefined;
+      company = typeof organization?.name === 'string' ? organization.name : '';
+      break;
+    }
+    if (object['@graph']) queue.push(object['@graph']);
+  }
+  const jobLink = [...document.querySelectorAll<HTMLAnchorElement>('a[href]')].find((link) => /^(?:view|back to|read|see) (?:the )?(?:job|position)(?: description| posting| details)?$/i.test(cleanLabelText(link.textContent)) && new URL(link.href, location.href).origin === location.origin);
+  const jobUrl = jobLink?.href || (location.hostname === 'jobs.ashbyhq.com' && /\/application\/?$/.test(location.pathname) ? `${location.origin}${location.pathname.replace(/\/application\/?$/, '')}` : undefined);
+  return { description, company, role, jobUrl };
+}
+
 function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement, value: string) {
   const setter = element instanceof HTMLInputElement ? HTMLInputElement.prototype : element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLSelectElement.prototype;
   Object.getOwnPropertyDescriptor(setter, 'value')?.set?.call(element, value);
