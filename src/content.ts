@@ -291,7 +291,7 @@ function setValue(element: HTMLInputElement | HTMLTextAreaElement | HTMLSelectEl
 // Custom dropdowns keep their truth in a listbox, not in the input's value: typing a location
 // leaves the field unset until an option is actually chosen.
 async function pickListOption(element: HTMLElement, value: string) {
-  const isCombobox = /\bcombobox\b/i.test(element.getAttribute('role') ?? '') || element.hasAttribute('aria-autocomplete');
+  const isCombobox = /\bcombobox\b/i.test(element.getAttribute('role') ?? '') || element.hasAttribute('aria-autocomplete') || element.getAttribute('aria-haspopup') === 'listbox';
   if (!isCombobox) return false;
   const wanted = optionEquivalents(value);
   const controlledId = element.getAttribute('aria-controls') || element.getAttribute('aria-owns');
@@ -391,8 +391,10 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
       } else if (first instanceof HTMLInputElement || first instanceof HTMLTextAreaElement || first instanceof HTMLSelectElement) {
         first.focus();
         setValue(first, value);
-        if ((first.getAttribute('role') === 'combobox' || first.hasAttribute('aria-autocomplete')) && !await pickListOption(first, value)) continue;
-        expected = first.value;
+        if (first.getAttribute('role') === 'combobox' || first.hasAttribute('aria-autocomplete')) {
+          if (!await pickListOption(first, value)) continue;
+          expected = first.value;
+        }
       } else if (first.getAttribute('role') === 'combobox' || first.getAttribute('aria-haspopup') === 'listbox') {
         first.click();
         if (!await pickListOption(first, value)) continue;
