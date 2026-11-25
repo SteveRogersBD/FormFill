@@ -58,17 +58,26 @@ export function needsConfirmation(field: DetectedField) {
 
 export function fitsControl(field: DetectedField, value: string): string {
   if (!value.trim()) return '';
+  if (field.maxLength !== undefined && value.length > field.maxLength) return '';
   if (field.options.length) {
     const normalize = (text: string) => text.toLowerCase().replace(/[^a-z0-9]/g, '');
-    return field.options.find((option) => normalize(option) === normalize(value)) ?? '';
+    const option = field.options.find((option) => normalize(option) === normalize(value));
+    if (!option) return '';
+    value = option;
   }
   if (field.type === 'number' && !/^-?\d+(\.\d+)?$/.test(value)) return '';
   if (field.type === 'email' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) return '';
   if (field.type === 'checkbox' && !['true', 'false'].includes(value)) return '';
+  if (field.type === 'checkbox' && field.required && value !== 'true') return '';
   if (field.type === 'url' && !/^https?:\/\/\S+$/i.test(value)) return '';
   if (field.type === 'date' && !/^\d{4}-\d{2}-\d{2}$/.test(value)) return '';
   if (field.type === 'month' && !/^\d{4}-(0[1-9]|1[0-2])$/.test(value)) return '';
-  if (field.maxLength !== undefined && value.length > field.maxLength) return '';
+  if (field.pattern && typeof document !== 'undefined') {
+    const control = document.createElement('input');
+    control.pattern = field.pattern;
+    control.value = value;
+    if (!control.checkValidity()) return '';
+  }
   if (['number', 'date', 'month'].includes(field.type)) {
     const numeric = field.type === 'number';
     if (field.min && (numeric ? Number(value) < Number(field.min) : value < field.min)) return '';
