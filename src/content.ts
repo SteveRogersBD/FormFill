@@ -34,7 +34,7 @@ function optionLabel(element: HTMLInputElement) {
 function descriptionFor(element: HTMLElement) {
   const ids = element.getAttribute('aria-describedby')?.split(/\s+/) ?? [];
   const explicit = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
-  return cleanLabelText(explicit || element.closest(questionContainer)?.querySelector('.ashby-application-form-question-description')?.textContent).slice(0, 1200);
+  return cleanLabelText(explicit || element.closest(questionContainer)?.querySelector('.ashby-application-form-question-description')?.textContent);
 }
 
 // A bare "Yes" is the option, not the question, so it must never become the field label.
@@ -84,6 +84,12 @@ const stateCodeByName: Record<string, string> = Object.fromEntries(Object.entrie
 
 function normalizeOption(value: string) {
   return value.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function stableFieldId(label: string, identity: string, occurrence: number) {
+  let hash = 2166136261;
+  for (const char of `${label}|${identity}|${occurrence}`) hash = Math.imul(hash ^ char.charCodeAt(0), 16777619);
+  return `applyai-${(hash >>> 0).toString(36)}`;
 }
 
 function monthValue(value: string) {
