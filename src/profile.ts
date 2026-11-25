@@ -31,7 +31,7 @@ export function normalizeWorkExperience(value: unknown): unknown {
     const role = line.length <= 160 && !line.endsWith('.') && line.split(/\s+/).length <= 12
       && !/^(led|built|worked|created|managed|designed|developed|drove|owned|shipped|delivered|launched|partnered|collaborated)\b/i.test(line)
       ? line.match(/^(.+?)\s+at\s+(.+?)(?:\s*[·|]\s*.*)?$/i) : null;
-    if (role || !entries.length) entries.push(workExperienceSchema.parse({ id: `imported-${index}`, jobTitle: role?.[1] ?? '', company: role?.[2] ?? '', summary: role ? line.split(/[·|]/).slice(1).join(' · ').trim() : '' }));
+    if (role || !entries.length) entries.push(workExperienceSchema.parse({ id: `imported-${index}`, jobTitle: role?.[1] ?? '', company: role?.[2] ?? '', summary: role ? line.split(/[·|]/).slice(1).map((part) => part.trim()).join(' · ') : '' }));
     if (!role) entries[entries.length - 1].description.push(line);
   }
   return entries;
