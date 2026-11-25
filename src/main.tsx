@@ -5,6 +5,7 @@ import { Dashboard } from './Dashboard';
 import { AuthScreen } from './AuthScreen';
 import { SidePanel } from './SidePanel';
 import { firebaseReady, getFirebaseServices } from './firebase';
+import { clearWorkspace } from './applicationWorkspace';
 import './styles.css';
 
 function App() {
@@ -41,6 +42,7 @@ function App() {
     await signInWithCredential(auth, GoogleAuthProvider.credential(credential.idToken, credential.accessToken));
   };
   const logout = async () => {
+    if (user && typeof chrome !== 'undefined' && chrome.storage?.session) await clearWorkspace(user.uid);
     const { auth } = await getFirebaseServices();
     await signOut(auth);
   };
@@ -48,7 +50,7 @@ function App() {
   if (!authReady) return <main className="loading-screen">Loading ApplyAI…</main>;
   if (!firebaseReady) return <AuthScreen onLogin={login} sidePanel={sidePanel} setupRequired />;
   if (!user) return <AuthScreen onLogin={login} sidePanel={sidePanel} />;
-  return sidePanel ? <SidePanel user={user} onLogout={logout} /> : <Dashboard user={user} onLogout={logout} />;
+  return sidePanel ? <SidePanel key={user.uid} user={user} onLogout={logout} /> : <Dashboard user={user} onLogout={logout} />;
 }
 
 createRoot(document.getElementById('root')!).render(<App />);
