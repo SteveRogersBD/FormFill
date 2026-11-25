@@ -9,14 +9,14 @@ service cloud.firestore {
       allow write: if request.auth != null && request.auth.uid == userId
         && request.resource.data.keys().hasOnly([
           'workAuthorized', 'requiresSponsorship', 'sponsorshipNowOrFuture', 'sponsorshipFuture', 'visaStatus', 'workAuthExpiry',
-          'citizenship', 'clearanceLevel', 'exportControlEligible', 'inJobCountry',
+          'citizenship', 'workCountries', 'usCitizen', 'clearanceLevel', 'exportControlEligible', 'inJobCountry',
           'desiredSalary', 'salaryCurrency', 'salaryPeriod', 'currentSalary',
           'earliestStartDate', 'noticePeriod', 'willingToRelocate', 'remotePreference',
           'travelWillingness', 'shiftAvailability', 'driversLicense',
           'over18', 'backgroundCheckConsent', 'drugTestConsent', 'criminalRecord',
           'criminalRecordExplanation', 'previouslyEmployedHere', 'relativeEmployedHere',
           'boundByNonCompete', 'previouslyApplied', 'howDidYouHear',
-          'eeoOptIn', 'gender', 'pronouns', 'transgenderStatus', 'sexualOrientation',
+          'eeoOptIn', 'gender', 'pronouns', 'transgenderStatus', 'sexualOrientation', 'lgbtqIdentity',
           'raceEthnicity', 'hispanicLatino', 'veteranStatus', 'disabilityStatus', 'updatedAt'
         ]);
     }
