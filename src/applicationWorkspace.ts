@@ -36,3 +36,12 @@ export function saveWorkspace(workspace: ApplicationWorkspace): Promise<void> {
   writes = saving;
   return saving;
 }
+
+export async function loadWorkspace(uid: string): Promise<ApplicationWorkspace | null> {
+  await writes.catch(() => undefined);
+  const key = `applyAiWorkspace:${uid}`;
+  const data = await chrome.storage.session.get(key);
+  const parsed = workspaceSchema.safeParse(data[key]);
+  if (!parsed.success || parsed.data.uid !== uid) return null;
+  return parsed.data;
+}
