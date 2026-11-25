@@ -86,6 +86,12 @@ describe('matchQuestion', () => {
 });
 
 describe('questionAnswer', () => {
+  it('keeps LGBTQ identity private unless voluntary sharing is enabled', () => {
+    const question = matchQuestion('Do you identify as LGBTQ+?')!;
+    const saved = { ...emptyPreferences(), lgbtqIdentity: 'decline' as const };
+    expect(questionAnswer(question, saved)).toBe('');
+    expect(questionAnswer(question, { ...saved, eeoOptIn: true })).toBe('I don’t wish to answer');
+  });
   const preferences = { ...emptyPreferences(), requiresSponsorship: 'no' as const, visaStatus: 'H-1B', gender: 'Woman' };
 
   it('translates the stored value into the wording a form expects', () => {
