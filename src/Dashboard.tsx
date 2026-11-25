@@ -34,12 +34,16 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
   };
 
   useEffect(() => {
+    let cancelled = false;
+    setLoaded(false); setLoading(true); setEditing(null);
     Promise.all([loadProfile(user.uid), listApplications(user.uid), loadPreferences(user.uid)]).then(([savedProfile, records, savedPreferences]) => {
+      if (cancelled) return;
       setProfile(savedProfile ?? emptyProfile());
       setApplications(records);
       setPreferences(savedPreferences ?? emptyPreferences());
       setLoaded(true);
-    }).catch((reason) => setError(reason instanceof Error ? reason.message : 'Could not load your profile.')).finally(() => setLoading(false));
+    }).catch((reason) => { if (!cancelled) setError(reason instanceof Error ? reason.message : 'Could not load your profile.'); }).finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [user.uid]);
 
   const chooseResume = async (event: ChangeEvent<HTMLInputElement>) => {
