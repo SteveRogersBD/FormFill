@@ -43,6 +43,24 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 
 describe('AI side panel workflow', () => {
+  it('reports frame messaging failures while retaining results from reachable frames', async () => {
+    (chrome.scripting as any).executeScript = async () => [{ frameId: 0 }, { frameId: 1 }];
+    mocks.plan.mockResolvedValue({ entries: [
+      { fieldId: 'frame-0-name', value: 'Riley Example', status: 'ready', source: 'saved', evidence: [], reason: '', requiresConfirmation: false },
+      { fieldId: 'frame-1-email', value: 'riley@example.test', status: 'ready', source: 'saved', evidence: [], reason: '', requiresConfirmation: false },
+    ], attempts: [], warnings: [] });
+    mocks.message.mockImplementation(async (_tab: number, message: { type: string }, options: { frameId: number }) => {
+      const id = options.frameId === 0 ? 'name' : 'email';
+      if (message.type === 'APPLYAI_SCAN_FIELDS') return { ...application, fields: [{ id, label: id === 'name' ? 'Full name' : 'Email', type: 'text', required: true, options: [], selector: '' }] };
+      if (options.frameId === 1) throw new Error('Could not establish connection. Receiving end does not exist.');
+      return { filled: 1, failed: [], outcomes: { name: 'verified' } };
+    });
+    await act(async () => button('Scan and analyze with AI').click());
+    await act(async () => button('Fill reviewed answers').click());
+    expect(host.textContent).toContain('Verified 1 field');
+    expect(host.textContent).toContain('Receiving end does not exist');
+    expect(host.textContent).toContain('Filled and verified');
+  });
   it('offers prepared answers without filling an unapproved sensitive answer', async () => {
     await act(async () => button('Scan and analyze with AI').click());
     expect(button('Fill reviewed answers').disabled).toBe(true);
