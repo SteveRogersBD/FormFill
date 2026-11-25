@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { canPlan, fitsControl, needsConfirmation, savedPlan, type PlannerResult } from './planner';
 import type { User } from 'firebase/auth';
-import { findProfileValue, isSensitiveField } from './fields';
+import { findProfileValue } from './fields';
 import { getResumeAttachment, getResumeText, listApplications, loadPreferences, loadProfile, saveApplication, updateApplication, type ApplicationRecord } from './data';
 import { emptyProfile, PROFILE_FIELDS, type ResumeProfile } from './profile';
 import { emptyPreferences, PREFERENCE_FIELDS, type Preferences } from './preferences';
@@ -43,6 +43,9 @@ function evidenceLabel(path: string) {
   const [section, key] = path.split('.');
   if (section === 'preferences') return PREFERENCE_FIELDS.find((field) => field.key === key)?.label ?? 'Saved standing answer';
   if (section === 'profile') return PROFILE_FIELDS.find((field) => field.key === key)?.label ?? 'Saved profile';
+  if (section === 'resume') return 'Full resume text';
+  if (section === 'user') return 'Your edited answer';
+  if (section === 'application') return 'Existing application answer';
   return 'Reviewed profile';
 }
 
@@ -104,6 +107,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const [restored, setRestored] = useState(false);
   const [stale, setStale] = useState(false);
   const editedFields = useRef(new Set<string>());
+  const resumeSource = useRef('');
   const operation = useRef(0);
   const owner = useRef(user.uid);
   owner.current = user.uid;
@@ -118,7 +122,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const changeContext = (key: 'description' | 'resumeText', text: string) => {
     if (!scan) return;
     if (key === 'description') setScan({ ...scan, description: text, contextWarning: undefined });
-    else setResumeText(text);
+    else { setResumeText(text); resumeSource.current = profile.resumePath; }
     setConfirmed({}); setOutcomes({});
     setValues((current) => Object.fromEntries(Object.entries(current).filter(([id]) => editedFields.current.has(id) || !plan?.entries.some((entry) => entry.fieldId === id && ['ON_DEVICE', 'IN_CLOUD'].includes(entry.source)))));
     setPlan((current) => current ? { ...current, warnings: ['Context changed. Analyze again to prepare new AI answers. Your edited answers remain fixed.'], entries: current.entries.map((entry) => ['ON_DEVICE', 'IN_CLOUD'].includes(entry.source) && !editedFields.current.has(entry.fieldId) ? { ...entry, value: '', status: 'needs_user', reason: 'Context changed. Analyze again or enter an answer.' } : entry) } : null);
@@ -142,6 +146,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       return;
     }
     const { planApplication } = await import('./plannerModel');
+    if (token !== operation.current || owner.current !== uid) return;
     const result = await planApplication(input, (message) => { if (token === operation.current && owner.current === uid) setNotice(message); });
     if (token !== operation.current || owner.current !== uid) return;
     setPlan(result);
@@ -171,11 +176,12 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   useEffect(() => {
     let cancelled = false;
     operation.current += 1;
-    setRestored(false); setScan(null); setPlan(null); setValues({}); setConfirmed({}); setManualDone({}); setOutcomes({}); setResumeText(''); setCloudConsent(false); setBusy(false); setStale(false); editedFields.current.clear();
+    setRestored(false); setScan(null); setPlan(null); setValues({}); setConfirmed({}); setManualDone({}); setOutcomes({}); setResumeText(''); setCloudConsent(false); setBusy(false); setStale(false); editedFields.current.clear(); resumeSource.current = '';
     void loadWorkspace(user.uid).then((workspace) => {
       if (cancelled || !workspace) return;
       setScan(workspace.scan); setPlan(workspace.plan); setValues(workspace.values); setConfirmed(workspace.confirmed); setManualDone(workspace.manualDone); setResumeText(workspace.resumeText); setOutcomes(workspace.outcomes); setCompany(workspace.company); setRole(workspace.role);
       editedFields.current = new Set(workspace.edited);
+      resumeSource.current = workspace.resumePath ?? '';
       setNotice('Restored your temporary application workspace. Review it before filling.');
     }).catch(() => { if (!cancelled) setError('Could not restore the temporary workspace. You can scan the application again.'); }).finally(() => { if (!cancelled) setRestored(true); });
     return () => { cancelled = true; operation.current += 1; };
@@ -184,7 +190,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   useEffect(() => {
     if (!restored || !scan || scan.tabId === undefined || busy) return;
     let cancelled = false;
-    void saveWorkspace({ version: 1, uid: user.uid, tabId: scan.tabId, scan, plan, values, confirmed, manualDone, edited: [...editedFields.current], company, role, resumeText, outcomes, updatedAt: Date.now() }).catch(() => { if (!cancelled) setError('The workspace could not be saved for this session. Keep this panel open to retain your answers.'); });
+    void saveWorkspace({ version: 1, uid: user.uid, tabId: scan.tabId, scan, plan, values, confirmed, manualDone, edited: [...editedFields.current], company, role, resumeText, resumePath: resumeSource.current, outcomes, updatedAt: Date.now() }).catch(() => { if (!cancelled) setError('The workspace could not be saved for this session. Keep this panel open to retain your answers.'); });
     return () => { cancelled = true; };
   }, [restored, scan, plan, values, confirmed, manualDone, company, role, resumeText, outcomes, busy, user.uid]);
 
@@ -225,7 +231,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       const currentPreferences = latestPreferences ?? emptyPreferences();
       setProfile(currentProfile); setPreferences(currentPreferences);
       const result = await completeJobContext(attempt.scan);
-      let fullResumeText = profile.resumePath === currentProfile.resumePath ? resumeText : '';
+      let fullResumeText = resumeSource.current === currentProfile.resumePath ? resumeText : '';
       if (currentProfile.resumePath && !fullResumeText) {
         try { fullResumeText = await getResumeText(currentProfile.resumePath); }
         catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not read resume text. Paste it below.'); }
@@ -233,7 +239,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       if (token !== operation.current || owner.current !== uid) return;
       // Keep edits only for stable questions on the same application tab.
       if (scan?.url !== result.url || scan?.tabId !== result.tabId) editedFields.current.clear();
-      setScan(result); setResumeText(fullResumeText); setPlan(null); setManualDone({});
+      setScan(result); setResumeText(fullResumeText); resumeSource.current = currentProfile.resumePath; setPlan(null); setManualDone({});
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
       setValues((current) => Object.fromEntries(result.fields.map((field) => [field.id, editedFields.current.has(field.id) ? current[field.id] ?? '' : field.currentValue || savedAnswer(field.label, currentProfile, currentPreferences)])));
@@ -321,9 +327,9 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       const currentProfile = latestProfile ?? emptyProfile(); const currentPreferences = latestPreferences ?? emptyPreferences();
       setProfile(currentProfile); setPreferences(currentPreferences);
       let text = resumeText;
-      if (currentProfile.resumePath !== profile.resumePath) {
+      if (currentProfile.resumePath !== resumeSource.current) {
         text = currentProfile.resumePath ? await getResumeText(currentProfile.resumePath) : '';
-        setResumeText(text);
+        setResumeText(text); resumeSource.current = currentProfile.resumePath;
       }
       await analyze({ ...scan, company, role }, currentProfile, currentPreferences, text);
     }
