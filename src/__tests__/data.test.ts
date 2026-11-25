@@ -16,6 +16,12 @@ beforeEach(() => {
 });
 
 describe('Equal Employment persistence', () => {
+  it('keeps old answers after a denied write and explains the deployment problem', async () => {
+    const saved = await savePreferences({ ...emptyPreferences(), workCountries: 'Canada' }, 'owner');
+    mocks.setDoc.mockRejectedValueOnce({ code: 'permission-denied', message: 'Missing or insufficient permissions.' });
+    await expect(savePreferences({ ...emptyPreferences(), workCountries: 'United States' }, 'owner')).rejects.toThrow('Equal Employment answers were not saved');
+    expect(await loadPreferences('owner')).toEqual(saved);
+  });
   it('does not acknowledge a save before Firestore acknowledges the write', async () => {
     let acknowledge!: () => void;
     mocks.setDoc.mockImplementationOnce(() => new Promise<void>((resolve) => { acknowledge = resolve; }));
