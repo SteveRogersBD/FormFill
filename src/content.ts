@@ -151,6 +151,23 @@ function activateControl(element: HTMLElement) {
   element.click();
 }
 
+function controlOptions(element: HTMLElement): HTMLElement[] {
+  const selector = '[role="option"], [role="menuitemradio"], [role="menuitem"], [data-option], [class*="_option_"]';
+  const collect = (scope: ParentNode) => [...scope.querySelectorAll<HTMLElement>(selector)].filter((option) => option.getAttribute('aria-disabled') !== 'true' && !option.matches(':disabled') && visibleControl(option));
+  // React/portal menus may attach aria-controls only after opening. Re-read it
+  // on every poll, and follow every referenced popup instead of a stale ID.
+  const ids = `${element.getAttribute('aria-controls') ?? ''} ${element.getAttribute('aria-owns') ?? ''}`.trim().split(/\s+/).filter(Boolean);
+  const linked = ids.flatMap((id) => { const scope = document.getElementById(id); return scope ? collect(scope) : []; });
+  if (linked.length) return linked;
+  const local = element.closest(questionContainer);
+  const inside = local ? collect(local) : [];
+  if (inside.length) return inside;
+  const options = collect(document);
+  const groups = new Set(options.map((option) => option.closest('[role="listbox"], [role="menu"]') ?? option.parentElement));
+  // Only one visible unowned menu can safely belong to the active control.
+  return groups.size === 1 ? options : [];
+}
+
 function scanFields(): DetectedField[] {
   const elements = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')]
     .filter((element) => {
