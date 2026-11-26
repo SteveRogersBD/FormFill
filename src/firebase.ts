@@ -37,9 +37,9 @@ export async function getFirebaseServices() {
   return services;
 }
 
-export async function verifyAppCheck(): Promise<void> {
+export async function verifyAppCheck(forceRefresh = false): Promise<void> {
   await getFirebaseServices();
   if (!appCheckInstance) throw new Error('Firebase App Check is not configured.');
   const { getToken } = await import('firebase/app-check');
-  await getToken(appCheckInstance, false);
+  await getToken(appCheckInstance, forceRefresh);
 }
