@@ -41,3 +41,13 @@ export function readStoredDebugToken(): Promise<string> {
     } catch { finish(); }
   });
 }
+
+export async function getAppCheckDebugDetails(): Promise<AppCheckDebugDetails> {
+  if (import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG !== 'true') throw new Error('Debug-token copying is only available in the unpacked debug build.');
+  await getFirebaseServices();
+  const configured = (globalThis as typeof globalThis & { FIREBASE_APPCHECK_DEBUG_TOKEN?: string | boolean }).FIREBASE_APPCHECK_DEBUG_TOKEN;
+  const token = typeof configured === 'string' && configured ? configured : await readStoredDebugToken();
+  const projectId = import.meta.env.VITE_FIREBASE_PROJECT_ID ?? '';
+  const appId = import.meta.env.VITE_FIREBASE_APP_ID ?? '';
+  return { token, projectId, appId, consoleUrl: `https://console.firebase.google.com/project/${encodeURIComponent(projectId)}/appcheck/apps?selectedAppId=${encodeURIComponent(appId)}` };
+}
