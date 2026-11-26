@@ -9,6 +9,7 @@ import { matchQuestion, questionAnswer } from './questions';
 import { firebaseAppCheckReady } from './firebase';
 import { completeJobContext, hostPermissionPattern, type ApplicationScan } from './applicationPage';
 import { applicationReadiness, clearWorkspace, loadWorkspace, prepareFill, saveWorkspace } from './applicationWorkspace';
+import type { AppCheckDebugDetails } from './appCheckDebug';
 
 async function getActiveApplicationTab() {
   const [tab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
@@ -114,6 +115,8 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const [outcomes, setOutcomes] = useState<Record<string, 'verified' | 'failed' | 'skipped'>>({});
   const [restored, setRestored] = useState(false);
   const [stale, setStale] = useState(false);
+  const [debugSetup, setDebugSetup] = useState<Omit<AppCheckDebugDetails, 'token'> | null>(null);
+  const [debugTokenFallback, setDebugTokenFallback] = useState('');
   const editedFields = useRef(new Set<string>());
   const resumeSource = useRef('');
   const operation = useRef(0);
@@ -359,6 +362,23 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       const { checkAIConnection } = await import('./plannerModel');
       setNotice(await checkAIConnection());
     } catch (reason) { setNotice(''); setError(reason instanceof Error ? reason.message : 'Could not check the AI connection.'); }
+    finally { setBusy(false); }
+  };
+
+  const copyDebugToken = async () => {
+    setBusy(true); setError(''); setDebugTokenFallback('');
+    try {
+      const { getAppCheckDebugDetails } = await import('./appCheckDebug');
+      const { token, ...details } = await getAppCheckDebugDetails();
+      setDebugSetup(details);
+      try {
+        await navigator.clipboard.writeText(token);
+        setNotice('Debug token copied. In Firebase, choose Add debug token, enter a name such as “ApplyAI Chrome”, and paste the copied value into the token field. Save it, then retry Check AI connection.');
+      } catch {
+        setDebugTokenFallback(token);
+        setNotice('Clipboard access was unavailable. Copy the debug token shown below into Firebase’s Add debug token dialog, save, then retry Check AI connection.');
+      }
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not retrieve the extension debug token.'); }
     finally { setBusy(false); }
   };
 
