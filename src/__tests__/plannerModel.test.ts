@@ -30,6 +30,7 @@ describe('single-call hybrid adapter', () => {
     mocks.generate.mockResolvedValue({ response: { text: () => '{"status":"ready"}' } });
     expect(await checkAIConnection()).toContain('No Python server');
     expect(mocks.token).toHaveBeenCalledOnce(); expect(mocks.generate).toHaveBeenCalledOnce();
+    expect(mocks.token).toHaveBeenCalledWith(true);
     expect(mocks.generate.mock.calls[0][0]).toBe('Connection test. Return only {"status":"ready"}.');
     expect(mocks.prompt).not.toHaveBeenCalled();
   });
@@ -38,6 +39,19 @@ describe('single-call hybrid adapter', () => {
     mocks.token.mockRejectedValue(new Error('HTTP 403'));
     await expect(checkAIConnection()).rejects.toThrow('Manage debug tokens');
     expect(mocks.generate).not.toHaveBeenCalled();
+  });
+
+  it('does not mislabel an App Check network error as a token registration rejection', async () => {
+    mocks.token.mockRejectedValue(Object.assign(new Error('Network unavailable'), { code: 'appCheck/fetch-network-error' }));
+    await expect(checkAIConnection()).rejects.toThrow('does not confirm a token-registration problem');
+    expect(mocks.generate).not.toHaveBeenCalled();
+  });
+
+  it('retains the safe App Check error code and HTTP status without echoing secrets', () => {
+    const reason = { code: 'appCheck/fetch-status-error', customData: { httpStatus: 403 }, message: 'fixture-secret' };
+    const error = aiSetupError(reason, 'appcheck');
+    expect(error.message).toContain('HTTP 403'); expect(error.message).toContain('appCheck/fetch-status-error');
+    expect(error.message).not.toContain('fixture-secret');
   });
 
   it('turns provider setup failures into actionable messages without echoing key material', () => {
