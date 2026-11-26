@@ -8,10 +8,10 @@ import { emptyProfile } from '../profile';
 import { emptyPreferences } from '../preferences';
 import { SidePanel } from '../SidePanel';
 
-const mocks = vi.hoisted(() => ({ profile: vi.fn(), preferences: vi.fn(), plan: vi.fn(), message: vi.fn(), session: new Map<string, unknown>() }));
+const mocks = vi.hoisted(() => ({ profile: vi.fn(), preferences: vi.fn(), plan: vi.fn(), connection: vi.fn(), message: vi.fn(), session: new Map<string, unknown>() }));
 vi.mock('../data', () => ({ loadProfile: mocks.profile, loadPreferences: mocks.preferences, listApplications: async () => [], getResumeText: async () => 'Full resume text', getResumeAttachment: vi.fn(), saveApplication: vi.fn(), updateApplication: vi.fn() }));
 vi.mock('../firebase', () => ({ firebaseAppCheckReady: true }));
-vi.mock('../plannerModel', () => ({ planApplication: mocks.plan }));
+vi.mock('../plannerModel', () => ({ planApplication: mocks.plan, checkAIConnection: mocks.connection }));
 
 let root: Root;
 let host: HTMLDivElement;
@@ -43,6 +43,12 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
 
 describe('AI side panel workflow', () => {
+  it('shows Firebase connection failures without scanning or sharing the application', async () => {
+    mocks.connection.mockRejectedValue(new Error('Register this extension debug token in Firebase App Check.'));
+    await act(async () => button('Check AI connection').click());
+    expect(host.textContent).toContain('Register this extension debug token');
+    expect(mocks.connection).toHaveBeenCalledOnce(); expect(mocks.message).not.toHaveBeenCalled(); expect(mocks.plan).not.toHaveBeenCalled();
+  });
   it('reports frame messaging failures while retaining results from reachable frames', async () => {
     (chrome.scripting as any).executeScript = async () => [{ frameId: 0 }, { frameId: 1 }];
     mocks.plan.mockResolvedValue({ entries: [
@@ -126,16 +132,16 @@ describe('AI side panel workflow', () => {
     expect(host.textContent).not.toContain('Review answers');
   });
 
-  it('does not generate until the full JD is supplied and sends pasted context in one batch', async () => {
+  it('allows factual matching before the JD is supplied and enables drafting after context is added', async () => {
     mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => message.type === 'APPLYAI_SCAN_FIELDS' ? { ...application, description: '' } : { filled: 1, failed: [] });
     await act(async () => button('Scan and analyze with AI').click());
-    expect(mocks.plan).not.toHaveBeenCalled();
+    expect(mocks.plan.mock.calls[0][0].draftsAllowed).toBe(false);
     const description = host.querySelector('textarea')!;
     const full = 'Responsibilities '.repeat(1000) + 'FINAL REQUIREMENT';
     await act(async () => { description.value = full; Simulate.change(description); });
     await act(async () => button('Analyze answers again').click());
-    expect(mocks.plan).toHaveBeenCalledOnce();
-    expect(mocks.plan.mock.calls[0][0].job.description).toBe(full);
+    expect(mocks.plan).toHaveBeenCalledTimes(2);
+    expect(mocks.plan.mock.calls[1][0]).toMatchObject({ draftsAllowed: true, job: { description: full } });
   });
 
   it('detects new conditional questions after filling and requires another scan', async () => {
