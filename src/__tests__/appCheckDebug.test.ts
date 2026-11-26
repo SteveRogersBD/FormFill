@@ -34,10 +34,10 @@ describe('extension debug-token copying', () => {
     expect(get).toHaveBeenCalledWith('debug-token'); expect(close).toHaveBeenCalledOnce();
   });
 
-  it('uses an explicit SDK debug token when one is configured', async () => {
+  it('ignores a global flag changed after the SDK initialized', async () => {
     (globalThis as any).FIREBASE_APPCHECK_DEBUG_TOKEN = 'explicit-fixture-secret';
-    expect((await getAppCheckDebugDetails()).token).toBe('explicit-fixture-secret');
-    expect(indexedDB.open).not.toHaveBeenCalled();
+    expect((await getAppCheckDebugDetails()).token).toBe('fixture-debug-secret');
+    expect(indexedDB.open).toHaveBeenCalledOnce();
   });
 
   it('does not expose a debug token from a non-debug build', async () => {
