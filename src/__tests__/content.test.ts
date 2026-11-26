@@ -16,6 +16,31 @@ beforeEach(async () => {
 });
 
 describe('Ashby controls', () => {
+  it('reads external labels on custom radios with hidden backing inputs', async () => {
+    document.body.innerHTML = '<div role="radiogroup" aria-label="Gender"><button type="button" role="radio" id="man" data-state="unchecked"></button><label for="man">Man</label><input type="hidden"><button type="button" role="radio" id="woman" data-state="unchecked"></button><label for="woman">Woman</label><input type="hidden"></div>';
+    document.getElementById('man')!.addEventListener('mousedown', (event) => { (event.currentTarget as HTMLElement).setAttribute('data-state', 'checked'); });
+    const { fields } = await scan();
+    expect(fields).toHaveLength(1);
+    expect(fields[0].options).toEqual(['Man', 'Woman']);
+    expect(await fill({ [fields[0].id]: 'Man' })).toMatchObject({ filled: 1, failed: [] });
+  });
+
+  it('discovers a delayed portal menu even when an aria-controls ID is initially missing', async () => {
+    document.body.innerHTML = '<div class="ashby-application-form-field-entry"><label class="ashby-application-form-question-title">Gender</label><button type="button" role="combobox" aria-expanded="false">Choose</button></div>';
+    const combo = document.querySelector('button')!;
+    combo.addEventListener('mousedown', () => {
+      if (combo.getAttribute('aria-expanded') === 'true') { document.getElementById('portal')?.remove(); combo.setAttribute('aria-expanded', 'false'); return; }
+      setTimeout(() => {
+        combo.setAttribute('aria-expanded', 'true'); combo.setAttribute('aria-controls', 'portal');
+        const menu = document.createElement('div'); menu.id = 'portal'; menu.setAttribute('role', 'listbox'); menu.innerHTML = '<div role="option">Man</div><div role="option">Woman</div>'; document.body.append(menu);
+        menu.querySelectorAll<HTMLElement>('[role="option"]').forEach((option) => option.addEventListener('mousedown', () => { combo.textContent = option.textContent; combo.setAttribute('aria-expanded', 'false'); menu.remove(); }));
+      }, 20);
+    });
+    const { fields } = await scan();
+    expect(fields[0].options).toEqual(['Man', 'Woman']);
+    expect(await fill({ [fields[0].id]: 'Man' })).toMatchObject({ filled: 1, failed: [] });
+    expect(combo.textContent).toBe('Man');
+  });
   it('captures full job descriptions and stable identities without entering answers', async () => {
     const description = 'Responsibility '.repeat(900) + 'FINAL QUALIFICATION';
     document.body.innerHTML = `<div data-job-description>${description}</div><label for="email">Email</label><input id="email" type="email" required maxlength="80">`;
