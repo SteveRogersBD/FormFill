@@ -277,14 +277,12 @@ async function scoutCustomOptions() {
     const wasOpen = element.getAttribute('aria-expanded') === 'true';
     if (!wasOpen) {
       element.focus();
-      element.click();
+      activateControl(element);
       if (element.getAttribute('aria-expanded') !== 'true') element.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', code: 'ArrowDown', bubbles: true }));
     }
-    const controlledId = element.getAttribute('aria-controls') || element.getAttribute('aria-owns');
     let options: HTMLElement[] = [];
-    for (let attempt = 0; attempt < 4; attempt++) {
-      const scope = controlledId ? document.getElementById(controlledId) : element.closest(questionContainer) ?? document;
-      options = [...(scope ?? document).querySelectorAll<HTMLElement>('[role="option"]')].filter((option) => option.getAttribute('aria-disabled') !== 'true');
+    for (let attempt = 0; attempt < 10; attempt++) {
+      options = controlOptions(element);
       if (options.length) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
@@ -292,7 +290,7 @@ async function scoutCustomOptions() {
     element.setAttribute('data-applyai-current', cleanLabelText(options.find((option) => option.getAttribute('aria-selected') === 'true')?.textContent));
     if (!wasOpen) {
       element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-      if (element.getAttribute('aria-expanded') === 'true') element.click();
+      if (element.getAttribute('aria-expanded') === 'true') activateControl(element);
       element.blur();
     }
   }
@@ -335,10 +333,8 @@ async function pickListOption(element: HTMLElement, value: string) {
   const isCombobox = /\bcombobox\b/i.test(element.getAttribute('role') ?? '') || element.hasAttribute('aria-autocomplete') || element.getAttribute('aria-haspopup') === 'listbox';
   if (!isCombobox) return false;
   const wanted = optionEquivalents(value);
-  const controlledId = element.getAttribute('aria-controls') || element.getAttribute('aria-owns');
-  const scope = controlledId ? document.getElementById(controlledId) : element.closest(questionContainer) ?? document;
   for (let attempt = 0; attempt < 12; attempt += 1) {
-    const options = [...(scope ?? document).querySelectorAll<HTMLElement>('[role="option"]')].filter((item) => item.getAttribute('aria-disabled') !== 'true');
+    const options = controlOptions(element);
     // Geographic suggestions may spell out a state or country. Accept only a unique
     // match for all saved components, never the first city with the same name.
     const parts = value.split(',').map((part) => optionEquivalents(part));
@@ -350,7 +346,7 @@ async function pickListOption(element: HTMLElement, value: string) {
       ?? (locations.length === 1 ? locations[0] : undefined);
     if (option) {
       const offered = cleanLabelText(option.textContent);
-      option.click();
+      activateControl(option);
       await new Promise((resolve) => setTimeout(resolve, 100));
       const selected = option.getAttribute('aria-selected') === 'true';
       const displayed = element instanceof HTMLInputElement ? element.value : cleanLabelText(element.textContent);
@@ -386,7 +382,7 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
         const wanted = optionEquivalents(value);
         const choice = elements.find((element) => wanted.has(normalizeOption(element.textContent ?? '')));
         if (!choice || (choice instanceof HTMLButtonElement && choice.form && choice.type !== 'button')) continue;
-        choice.click();
+        activateControl(choice);
         checks.set(id, () => choice.isConnected && (choice.getAttribute('aria-pressed') === 'true' || choice.getAttribute('aria-checked') === 'true'));
         filled += 1;
         continue;
@@ -437,7 +433,7 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
           expected = first.value;
         }
       } else if (first.getAttribute('role') === 'combobox' || first.getAttribute('aria-haspopup') === 'listbox') {
-        first.click();
+        activateControl(first);
         if (!await pickListOption(first, value)) continue;
         checks.set(id, () => first.isConnected && first.getAttribute('aria-invalid') !== 'true' && (first.getAttribute('aria-expanded') === 'false' || cleanLabelText(first.textContent) === value));
         filled += 1;
