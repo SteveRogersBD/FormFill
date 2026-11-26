@@ -1,7 +1,7 @@
 import { getAI, getGenerativeModel, GoogleAIBackend, InferenceMode, Schema } from 'firebase/ai';
 import { z } from 'zod';
 import { getApp } from 'firebase/app';
-import { firebaseAppCheckReady } from './firebase';
+import { firebaseAppCheckReady, getFirebaseServices } from './firebase';
 import { runPlanner } from './plannerGraph';
 import { proposalSchema, type PlannerInput } from './planner';
 
@@ -15,6 +15,22 @@ const responseSchema = Schema.object({ properties: {
 function deadline<T>(work: Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
   return Promise.race([work, new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error('AI request timed out.')), ms); })]).finally(() => clearTimeout(timer));
+}
+
+export function aiSetupError(reason: unknown): Error {
+  const code = reason && typeof reason === 'object' && 'code' in reason ? String(reason.code) : '';
+  const message = reason instanceof Error ? reason.message : String(reason);
+  const text = `${code} ${message}`;
+  let guidance = 'Cloud AI could not connect. Check Firebase Console > AI Logic and App Check, then use Check AI connection.';
+  if (/app.?check|attestation|recaptcha|initial-throttle|throttled/i.test(text)) guidance = 'Firebase App Check rejected this extension. For the unpacked debug build, register this extension browser’s debug token in Firebase Console > App Check > Apps > Manage debug tokens.';
+  else if (/not enabled|has not been used|service_disabled|api_key_service_blocked|permission.denied|403/i.test(text)) guidance = 'Firebase rejected the AI request. In Firebase Console > AI Logic, complete Get started for the Gemini Developer API; check API restrictions and App Check registration.';
+  else if (/api.?key.*(invalid|missing)|api_key_invalid/i.test(text)) guidance = 'The Firebase web API key is missing or invalid. Check VITE_FIREBASE_API_KEY in .env.local and rebuild the extension. The service-account JSON does not replace the web key.';
+  else if (/quota|resource.exhausted|429/i.test(text)) guidance = 'The AI project quota was exceeded. Check Firebase AI Logic quota and billing, then retry later.';
+  else if (/model|not.found|404/i.test(text)) guidance = 'The configured AI model is unavailable. Check VITE_FIREBASE_AI_MODEL against models enabled in Firebase AI Logic, then rebuild.';
+  else if (/timed out|network|fetch/i.test(text)) guidance = 'The AI connection failed or timed out. Check network access and retry Check AI connection.';
+  const error = new Error(guidance);
+  error.name = 'AISetupError';
+  return error;
 }
 
 interface DeviceSession {
