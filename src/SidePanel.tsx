@@ -143,20 +143,15 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       fields: application.fields, profile: currentProfile, preferences: currentPreferences,
       job: { company: application.company, role: application.role, description: application.description },
       resumeText: fullResumeText,
+      draftsAllowed: Boolean(application.description?.trim() && (!currentProfile.resumePath || fullResumeText.trim())),
       fixedAnswers: Object.fromEntries([...editedFields.current].map((id) => [id, values[id] ?? ''])),
       allowCloud: cloudConsent && firebaseAppCheckReady,
     };
-    if (!application.description?.trim() || (currentProfile.resumePath && !fullResumeText.trim())) {
-      const result = { entries: savedPlan(input), attempts: [], warnings: ['Add the full job description and resume context below before making the AI request. Saved answers are prepared for review.'] } satisfies PlannerResult;
-      setPlan(result);
-      setValues((current) => ({ ...Object.fromEntries(result.entries.map((entry) => [entry.fieldId, entry.value])), ...Object.fromEntries([...editedFields.current].map((id) => [id, current[id] ?? ''])) }));
-      setNotice('Application staged. Add the missing context, then choose Analyze answers again.');
-      return;
-    }
     const { planApplication } = await import('./plannerModel');
     if (token !== operation.current || owner.current !== uid) return;
     const result = await planApplication(input, (message) => { if (token === operation.current && owner.current === uid) setNotice(message); });
     if (token !== operation.current || owner.current !== uid) return;
+    if (!input.draftsAllowed) result.warnings.push('Saved facts and AI field matching are available. Add the full job description and resume text before drafting written answers.');
     setPlan(result);
     setValues((current) => ({ ...current, ...Object.fromEntries(result.entries.filter((entry) => !editedFields.current.has(entry.fieldId)).map((entry) => [entry.fieldId, entry.value])) }));
     setConfirmed({});
