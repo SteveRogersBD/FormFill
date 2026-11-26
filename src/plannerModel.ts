@@ -33,6 +33,23 @@ export function aiSetupError(reason: unknown): Error {
   return error;
 }
 
+export async function checkAIConnection(): Promise<string> {
+  if (!firebaseAppCheckReady) throw aiSetupError(new Error('App Check is not configured.'));
+  await getFirebaseServices();
+  const { getAppCheck, getToken } = await import('firebase/app-check');
+  try { await deadline(getToken(getAppCheck(), false), 15_000); }
+  catch { throw aiSetupError(new Error('App Check verification failed.')); }
+  try {
+    const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), {
+      mode: InferenceMode.ONLY_IN_CLOUD,
+      inCloudParams: { model: import.meta.env.VITE_FIREBASE_AI_MODEL || 'gemini-3.5-flash-lite', generationConfig: { responseMimeType: 'application/json', responseSchema: Schema.object({ properties: { status: Schema.string() } }), maxOutputTokens: 64 } },
+    });
+    const result = await deadline(model.generateContent('Connection test. Return only {"status":"ready"}.'), 25_000);
+    if (JSON.parse(result.response.text()).status !== 'ready') throw new Error('The AI connection test returned an unexpected response.');
+    return 'Cloud AI connected and answered successfully. No Python server is required.';
+  } catch (reason) { throw aiSetupError(reason); }
+}
+
 interface DeviceSession {
   contextWindow?: number;
   inputQuota?: number;
