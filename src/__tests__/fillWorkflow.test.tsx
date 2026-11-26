@@ -2,6 +2,7 @@
 // @vitest-environment-options {"url":"https://jobs.ashbyhq.com/apex-technology-inc/692bb497-59ba-44df-bacf-fffd2f7c6344/application?jr_id=test"}
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { createPortal } from 'react-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { User } from 'firebase/auth';
 import { emptyProfile } from '../profile';
@@ -13,7 +14,7 @@ const modelWork = vi.hoisted(() => ({ current: null as Promise<unknown> | null, 
 vi.mock('../firebase', () => ({ firebaseAppCheckReady: false }));
 vi.mock('../data', () => ({
   loadProfile: async () => ({ ...emptyProfile(), updatedAt: 1, fullName: 'Riley Example', email: 'riley@example.test', phone: '+15550101234', postalCode: '60601', linkedin: 'https://linkedin.com/in/riley-example' }),
-  loadPreferences: async () => ({ ...emptyPreferences() }), listApplications: async () => [], getResumeText: vi.fn(), getResumeAttachment: vi.fn(), saveApplication: vi.fn(), updateApplication: vi.fn(),
+  loadPreferences: async () => ({ ...emptyPreferences(), eeoOptIn: true, gender: 'Male', veteranStatus: 'I am not a veteran', remotePreference: 'hybrid' }), listApplications: async () => [], getResumeText: vi.fn(), getResumeAttachment: vi.fn(), saveApplication: vi.fn(), updateApplication: vi.fn(),
 }));
 vi.mock('../plannerModel', async () => {
   const { runPlanner } = await import('../plannerGraph');
