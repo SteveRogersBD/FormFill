@@ -177,6 +177,13 @@ function selectedChoice(element: HTMLElement) {
     || /(?:^|[\s_-])(selected|checked|active)(?:[\s_-]|$)/i.test(element.className);
 }
 
+function controlLabel(element: HTMLElement) {
+  const ids = element.getAttribute('aria-labelledby')?.split(/\s+/) ?? [];
+  const labelled = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
+  const external = element.id ? [...document.querySelectorAll<HTMLLabelElement>('label[for]')].find((label) => label.htmlFor === element.id)?.textContent : '';
+  return cleanLabelText(element.getAttribute('aria-label') || labelled || external || element.textContent || element.getAttribute('data-option') || element.getAttribute('value'));
+}
+
 function scanFields(): DetectedField[] {
   const elements = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')]
     .filter((element) => {
