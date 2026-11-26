@@ -141,6 +141,16 @@ function visibleControl(element: HTMLElement) {
   return true;
 }
 
+function activateControl(element: HTMLElement) {
+  const pointer = typeof PointerEvent === 'function' ? PointerEvent : MouseEvent;
+  element.dispatchEvent(new pointer('pointerdown', { bubbles: true, cancelable: true, button: 0, buttons: 1 }));
+  element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1 }));
+  if (element.isConnected) element.focus({ preventScroll: true });
+  element.dispatchEvent(new pointer('pointerup', { bubbles: true, cancelable: true, button: 0, buttons: 0 }));
+  element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0, buttons: 0 }));
+  element.click();
+}
+
 function scanFields(): DetectedField[] {
   const elements = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')]
     .filter((element) => {
