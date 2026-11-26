@@ -171,6 +171,7 @@ function controlOptions(element: HTMLElement): HTMLElement[] {
 }
 
 function selectedChoice(element: HTMLElement) {
+  if (/(?:not[-_\s]|un)(?:selected|checked|active)/i.test(element.className)) return false;
   return element.getAttribute('aria-pressed') === 'true' || element.getAttribute('aria-checked') === 'true'
     || element.getAttribute('aria-selected') === 'true' || /^(checked|selected|on)$/.test(element.getAttribute('data-state') ?? '')
     || /(?:^|[\s_-])(selected|checked|active)(?:[\s_-]|$)/i.test(element.className);
@@ -234,10 +235,11 @@ function scanFields(): DetectedField[] {
 // Ashby uses buttons backed by a checkbox. Other sites expose explicit radio groups.
 // Restrict scanning to those containers and exclude any button that could submit a form.
 function scanChoiceGroups(startIndex: number): DetectedField[] {
-  const groups = [...document.querySelectorAll<HTMLElement>('.ashby-application-form-input-yesno, form [role="radiogroup"], form fieldset:not(:has([role="radiogroup"]))')];
+  const groups = [...document.querySelectorAll<HTMLElement>('.ashby-application-form-input-yesno, [role="radiogroup"], form fieldset:not(:has([role="radiogroup"]))')];
   const fields: DetectedField[] = [];
   for (const group of groups) {
-    if (!group.matches('.ashby-application-form-input-yesno') && group.querySelector('input, textarea, select')) continue;
+    if (!visibleControl(group)) continue;
+    if (!group.matches('.ashby-application-form-input-yesno') && [...group.querySelectorAll<HTMLElement>('input[data-applyai-field], textarea[data-applyai-field], select[data-applyai-field]')].some(visibleControl)) continue;
     const buttons = [...group.querySelectorAll<HTMLElement>('button, [role="radio"]')]
       .filter((button) => {
         if (button instanceof HTMLButtonElement && (button.disabled || (button.form && button.type !== 'button'))) return false;
@@ -259,7 +261,7 @@ function scanChoiceGroups(startIndex: number): DetectedField[] {
       type: 'choice',
       required: group.getAttribute('aria-required') === 'true' || Boolean(group.closest(questionContainer)?.querySelector('[class*="_required_"]')),
       options: buttons.map((button) => cleanLabelText(button.textContent)),
-      currentValue: cleanLabelText(buttons.find(selectedChoice)?.textContent),
+      currentValue: buttons.filter(selectedChoice).length === 1 ? cleanLabelText(buttons.find(selectedChoice)?.textContent) : '',
       selector: `[data-applyai-field="${id}"]`,
     });
   }
@@ -391,7 +393,7 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
         const choice = elements.find((element) => wanted.has(normalizeOption(element.textContent ?? '')));
         if (!choice || (choice instanceof HTMLButtonElement && choice.form && choice.type !== 'button')) continue;
         activateControl(choice);
-        checks.set(id, () => choice.isConnected && selectedChoice(choice));
+        checks.set(id, () => choice.isConnected && selectedChoice(choice) && !elements.some((peer) => peer !== choice && selectedChoice(peer)));
         filled += 1;
         continue;
       }
