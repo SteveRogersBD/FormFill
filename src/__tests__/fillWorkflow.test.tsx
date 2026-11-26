@@ -23,6 +23,20 @@ vi.mock('../plannerModel', async () => {
 
 const roots: Root[] = [];
 
+function ControlledChoices() {
+  const [open, setOpen] = useState(false);
+  const [gender, setGender] = useState('');
+  const [veteran, setVeteran] = useState('');
+  const [arrangement, setArrangement] = useState('');
+  return <>
+    <div className="ashby-application-form-field-entry"><label className="ashby-application-form-question-title">Gender</label><button type="button" role="combobox" aria-expanded={open} aria-controls={open ? 'gender-popup' : undefined} onMouseDown={(event) => { event.preventDefault(); setOpen((current) => !current); }}>{gender || 'Choose gender'}</button></div>
+    {open && createPortal(<div role="listbox" id="gender-popup">{['Man', 'Woman'].map((option) => <div key={option} role="option" onMouseDown={(event) => { event.preventDefault(); setGender(option); setOpen(false); }}>{option}</div>)}</div>, document.body)}
+    <label htmlFor="veteran">Veteran status</label><select id="veteran" required value={veteran} onChange={(event) => setVeteran(event.target.value)}><option value="">Choose</option><option value="none">I am not a veteran</option><option value="veteran">I am a veteran</option></select>
+    <div role="radiogroup" aria-label="Preferred work arrangement">{['Remote', 'Hybrid'].map((option) => <span key={option}><button type="button" role="radio" data-state={arrangement === option ? 'checked' : 'unchecked'} onMouseDown={() => setArrangement(option)}>{option}</button><input type="hidden" value={arrangement === option ? 'true' : 'false'} /></span>)}</div>
+    <output aria-label="Accepted choice values">{JSON.stringify({ gender, veteran, arrangement })}</output>
+  </>;
+}
+
 function ControlledApplication() {
   const [values, setValues] = useState<Record<string, string>>({});
   return <form onSubmit={(event) => { event.preventDefault(); throw new Error('Autofill must never submit.'); }}>
