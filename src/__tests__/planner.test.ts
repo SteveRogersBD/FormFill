@@ -13,6 +13,23 @@ const proposal = (fieldId: string, kind: Proposal['kind'], keys: string[], draft
 const response = (...answers: Proposal[]) => JSON.stringify({ answers });
 
 describe('application planning graph', () => {
+  it('uses saved answers for equivalent dropdown and Yes/No option wording without AI', async () => {
+    const request = input([field('1', 'Gender', 'select', ['Man', 'Woman']), field('2', 'Country', 'select', ['USA', 'Canada']), field('3', 'Do you require sponsorship?', 'choice', ['Yes, I require sponsorship', 'No, I do not require sponsorship'])]);
+    request.profile.country = 'United States'; request.preferences.gender = 'Male'; request.preferences.eeoOptIn = true;
+    const prepareDevice = vi.fn(); const device = vi.fn(); const cloud = vi.fn();
+    const result = await runPlanner(request, { prepareDevice, device, cloud });
+    expect(result.entries.map((entry) => entry.value)).toEqual(['Man', 'USA', 'No, I do not require sponsorship']);
+    expect(prepareDevice).not.toHaveBeenCalled(); expect(device).not.toHaveBeenCalled(); expect(cloud).not.toHaveBeenCalled();
+  });
+
+  it('maps factual answers with incomplete job context while withholding narrative drafts', async () => {
+    const request = input([field('1', 'Your professional network page'), field('2', 'Why hire you?', 'textarea')]);
+    request.draftsAllowed = false;
+    const result = await runPlanner(request, { prepareDevice: async () => true, device: vi.fn().mockResolvedValue(response(proposal('1', 'profile', ['linkedin']), proposal('2', 'draft', ['skills'], 'I build TypeScript systems.'))), cloud: vi.fn() });
+    expect(result.entries[0].value).toBe('https://linkedin.com/in/jordan');
+    expect(result.entries[1].value).toBe('');
+    expect(result.attempts).toHaveLength(1);
+  });
   it('allows unfamiliar descriptive wording but rejects narrative answers to known factual questions', () => {
     const request = input([]);
     expect(validateProposal(proposal('1', 'draft', ['workExperience'], 'My dashboard work provides relevant experience.'), field('1', 'Give an example of relevant work', 'textarea'), request, 'IN_CLOUD')).toMatchObject({ status: 'needs_review', requiresConfirmation: true });
