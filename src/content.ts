@@ -144,8 +144,8 @@ function visibleControl(element: HTMLElement) {
 function activateControl(element: HTMLElement) {
   const pointer = typeof PointerEvent === 'function' ? PointerEvent : MouseEvent;
   element.dispatchEvent(new pointer('pointerdown', { bubbles: true, cancelable: true, button: 0, buttons: 1 }));
-  element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1 }));
-  if (element.isConnected) element.focus({ preventScroll: true });
+  const mayFocus = element.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, buttons: 1 }));
+  if (mayFocus && element.isConnected) element.focus({ preventScroll: true });
   element.dispatchEvent(new pointer('pointerup', { bubbles: true, cancelable: true, button: 0, buttons: 0 }));
   element.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0, buttons: 0 }));
   element.click();
@@ -153,7 +153,7 @@ function activateControl(element: HTMLElement) {
 
 function controlOptions(element: HTMLElement): HTMLElement[] {
   const selector = '[role="option"], [role="menuitemradio"], [role="menuitem"], [data-option], [class*="_option_"]';
-  const collect = (scope: ParentNode) => [...scope.querySelectorAll<HTMLElement>(selector)].filter((option) => option.getAttribute('aria-disabled') !== 'true' && !option.matches(':disabled') && visibleControl(option));
+  const collect = (scope: ParentNode) => [...scope.querySelectorAll<HTMLElement>(selector)].filter((option) => option.getAttribute('aria-disabled') !== 'true' && !option.matches(':disabled') && !option.closest('.ashby-application-form-input-yesno') && visibleControl(option));
   // React/portal menus may attach aria-controls only after opening. Re-read it
   // on every poll, and follow every referenced popup instead of a stale ID.
   const ids = `${element.getAttribute('aria-controls') ?? ''} ${element.getAttribute('aria-owns') ?? ''}`.trim().split(/\s+/).filter(Boolean);
@@ -162,6 +162,8 @@ function controlOptions(element: HTMLElement): HTMLElement[] {
   const local = element.closest(questionContainer);
   const inside = local ? collect(local) : [];
   if (inside.length) return inside;
+  const popupGroups = [...document.querySelectorAll<HTMLElement>('[role="listbox"], [role="menu"]')].filter(visibleControl).map(collect).filter((options) => options.length);
+  if (popupGroups.length === 1) return popupGroups[0];
   const options = collect(document);
   const groups = new Set(options.map((option) => option.closest('[role="listbox"], [role="menu"]') ?? option.parentElement));
   // Only one visible unowned menu can safely belong to the active control.
