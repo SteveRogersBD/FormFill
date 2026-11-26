@@ -353,6 +353,15 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     finally { setBusy(false); }
   };
 
+  const checkConnection = async () => {
+    setBusy(true); setError(''); setNotice('Checking Firebase App Check and cloud AI with a test prompt…');
+    try {
+      const { checkAIConnection } = await import('./plannerModel');
+      setNotice(await checkAIConnection());
+    } catch (reason) { setNotice(''); setError(reason instanceof Error ? reason.message : 'Could not check the AI connection.'); }
+    finally { setBusy(false); }
+  };
+
   const confirmSubmitted = async () => {
     if (!scan) return;
     setBusy(true); setError('');
