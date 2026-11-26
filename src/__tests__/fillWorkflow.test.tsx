@@ -2,7 +2,7 @@
 // @vitest-environment-options {"url":"https://jobs.ashbyhq.com/apex-technology-inc/692bb497-59ba-44df-bacf-fffd2f7c6344/application?jr_id=test"}
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { User } from 'firebase/auth';
 import { emptyProfile } from '../profile';
@@ -29,10 +29,10 @@ function ControlledChoices() {
   const [veteran, setVeteran] = useState('');
   const [arrangement, setArrangement] = useState('');
   return <>
-    <div className="ashby-application-form-field-entry"><label className="ashby-application-form-question-title">Gender</label><button type="button" role="combobox" aria-expanded={open} aria-controls={open ? 'gender-popup' : undefined} onMouseDown={(event) => { event.preventDefault(); setOpen((current) => !current); }}>{gender || 'Choose gender'}</button></div>
-    {open && createPortal(<div role="listbox" id="gender-popup">{['Man', 'Woman'].map((option) => <div key={option} role="option" onMouseDown={(event) => { event.preventDefault(); setGender(option); setOpen(false); }}>{option}</div>)}</div>, document.body)}
+    <div className="ashby-application-form-field-entry"><label className="ashby-application-form-question-title">Gender</label><button type="button" role="combobox" aria-expanded={open} aria-controls={open ? 'gender-popup' : undefined} onMouseDown={(event) => { event.preventDefault(); flushSync(() => setOpen((current) => !current)); }}>{gender || 'Choose gender'}</button></div>
+    {open && createPortal(<div role="listbox" id="gender-popup">{['Man', 'Woman'].map((option) => <div key={option} role="option" onMouseDown={(event) => { event.preventDefault(); flushSync(() => { setGender(option); setOpen(false); }); }}>{option}</div>)}</div>, document.body)}
     <label htmlFor="veteran">Veteran status</label><select id="veteran" required value={veteran} onChange={(event) => setVeteran(event.target.value)}><option value="">Choose</option><option value="none">I am not a veteran</option><option value="veteran">I am a veteran</option></select>
-    <div role="radiogroup" aria-label="Preferred work arrangement">{['Remote', 'Hybrid'].map((option) => <span key={option}><button type="button" role="radio" data-state={arrangement === option ? 'checked' : 'unchecked'} onMouseDown={() => setArrangement(option)}>{option}</button><input type="hidden" value={arrangement === option ? 'true' : 'false'} /></span>)}</div>
+    <div role="radiogroup" aria-label="Preferred work arrangement">{['Remote', 'Hybrid'].map((option) => <span key={option}><button type="button" role="radio" data-state={arrangement === option ? 'checked' : 'unchecked'} onMouseDown={() => flushSync(() => setArrangement(option))}>{option}</button><input type="hidden" value={arrangement === option ? 'true' : 'false'} /></span>)}</div>
     <output aria-label="Accepted choice values">{JSON.stringify({ gender, veteran, arrangement })}</output>
   </>;
 }
