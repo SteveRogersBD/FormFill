@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mocks = vi.hoisted(() => ({ initialize: vi.fn(), custom: vi.fn(), recaptcha: vi.fn(), providerOptions: undefined as { getToken: () => Promise<unknown> } | undefined }));
+const mocks = vi.hoisted(() => ({ initialize: vi.fn(), token: vi.fn(), custom: vi.fn(), recaptcha: vi.fn(), providerOptions: undefined as { getToken: () => Promise<unknown> } | undefined }));
 vi.mock('firebase/app', () => ({ initializeApp: () => ({ name: 'test' }) }));
 vi.mock('firebase/auth', () => ({ getAuth: () => ({}) }));
 vi.mock('firebase/firestore', () => ({ getFirestore: () => ({}) }));
@@ -10,6 +10,7 @@ vi.mock('firebase/app-check', async (original) => {
   const sdk = await original<typeof import('firebase/app-check')>();
   return {
     initializeAppCheck: mocks.initialize,
+    getToken: mocks.token,
     // Use the installed SDK's real provider implementation to check its initialize
     // behavior; only the Firebase service itself is mocked (no token/network calls).
     CustomProvider: class extends sdk.CustomProvider {
@@ -33,6 +34,15 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); delete (globalThis as any).FIREBASE_APPCHECK_DEBUG_TOKEN; });
 
 describe('App Check initialization', () => {
+  it('checks a token using the initialized provider instance', async () => {
+    vi.stubEnv('VITE_FIREBASE_APPCHECK_DEBUG', 'true');
+    const instance = { app: { name: 'test' } };
+    mocks.initialize.mockReturnValue(instance); mocks.token.mockResolvedValue({ token: 'fixture-token' });
+    const firebase = await import('../firebase');
+    await firebase.verifyAppCheck();
+    expect(mocks.token).toHaveBeenCalledWith(instance, false);
+    expect(mocks.initialize).toHaveBeenCalledOnce();
+  });
   it('uses a custom provider in debug mode without loading a remote script', async () => {
     vi.stubEnv('VITE_FIREBASE_APPCHECK_DEBUG', 'true');
     const firebase = await import('../firebase');
