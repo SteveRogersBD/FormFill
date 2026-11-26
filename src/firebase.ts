@@ -12,6 +12,7 @@ const appCheckDebug = import.meta.env.VITE_FIREBASE_APPCHECK_DEBUG === 'true';
 export const firebaseAppCheckReady = Boolean(appCheckSiteKey || appCheckDebug);
 
 let services: { auth: import('firebase/auth').Auth; db: import('firebase/firestore').Firestore; storage: import('firebase/storage').FirebaseStorage } | undefined;
+let appCheckInstance: import('firebase/app-check').AppCheck | undefined;
 
 export async function getFirebaseServices() {
   if (!firebaseReady) throw new Error('Add your Firebase web app settings to .env.local to enable sign-in and cloud storage.');
@@ -29,7 +30,7 @@ export async function getFirebaseServices() {
       const provider = appCheckDebug
         ? new CustomProvider({ getToken: async () => { throw new Error('App Check debug mode was not activated. Reload ApplyAI and try again.'); } })
         : new ReCaptchaV3Provider(appCheckSiteKey!);
-      initializeAppCheck(app, { provider, isTokenAutoRefreshEnabled: true });
+      appCheckInstance = initializeAppCheck(app, { provider, isTokenAutoRefreshEnabled: true });
     }
     services = { auth: getAuth(app), db: getFirestore(app), storage: getStorage(app) };
   }
