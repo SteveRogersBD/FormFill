@@ -8,10 +8,11 @@ import { emptyProfile } from '../profile';
 import { emptyPreferences } from '../preferences';
 import { SidePanel } from '../SidePanel';
 
-const mocks = vi.hoisted(() => ({ profile: vi.fn(), preferences: vi.fn(), plan: vi.fn(), connection: vi.fn(), message: vi.fn(), session: new Map<string, unknown>() }));
+const mocks = vi.hoisted(() => ({ profile: vi.fn(), preferences: vi.fn(), plan: vi.fn(), connection: vi.fn(), debug: vi.fn(), message: vi.fn(), session: new Map<string, unknown>() }));
 vi.mock('../data', () => ({ loadProfile: mocks.profile, loadPreferences: mocks.preferences, listApplications: async () => [], getResumeText: async () => 'Full resume text', getResumeAttachment: vi.fn(), saveApplication: vi.fn(), updateApplication: vi.fn() }));
 vi.mock('../firebase', () => ({ firebaseAppCheckReady: true }));
 vi.mock('../plannerModel', () => ({ planApplication: mocks.plan, checkAIConnection: mocks.connection }));
+vi.mock('../appCheckDebug', () => ({ getAppCheckDebugDetails: mocks.debug }));
 
 let root: Root;
 let host: HTMLDivElement;
@@ -23,6 +24,7 @@ const button = (label: string) => [...host.querySelectorAll('button')].find((ite
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  vi.stubEnv('VITE_FIREBASE_APPCHECK_DEBUG', 'true');
   mocks.session.clear();
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   mocks.profile.mockResolvedValue({ ...emptyProfile(), updatedAt: 1 });
@@ -40,9 +42,28 @@ beforeEach(async () => {
   host = document.createElement('div'); document.body.append(host); root = createRoot(host);
   await act(async () => { root.render(<SidePanel user={{ uid: 'user' } as User} onLogout={async () => {}} />); });
 });
-afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); });
+afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe('AI side panel workflow', () => {
+  it('copies the extension token and links its matching Firebase app without scanning or sending data', async () => {
+    mocks.debug.mockResolvedValue({ token: 'fixture-secret', projectId: 'fixture-project', appId: 'fixture-web-app', consoleUrl: 'https://console.firebase.google.com/project/fixture-project/appcheck/apps?selectedAppId=fixture-web-app' });
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText } });
+    await act(async () => button('Copy App Check debug token').click());
+    expect(writeText).toHaveBeenCalledWith('fixture-secret');
+    expect(host.textContent).toContain('Debug token copied');
+    expect(host.textContent).toContain('fixture-web-app');
+    expect(host.textContent).not.toContain('fixture-secret');
+    expect(mocks.message).not.toHaveBeenCalled(); expect(mocks.plan).not.toHaveBeenCalled();
+  });
+
+  it('provides manual token copying when clipboard access fails', async () => {
+    mocks.debug.mockResolvedValue({ token: 'fixture-secret', projectId: 'fixture-project', appId: 'fixture-web-app', consoleUrl: 'https://console.firebase.google.com/project/fixture-project/appcheck/apps' });
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: vi.fn().mockRejectedValue(new Error('Not allowed')) } });
+    await act(async () => button('Copy App Check debug token').click());
+    expect([...host.querySelectorAll('input')].find((input) => input.readOnly)?.value).toBe('fixture-secret');
+    expect(host.textContent).toContain('Clipboard access was unavailable');
+  });
   it('shows Firebase connection failures without scanning or sharing the application', async () => {
     mocks.connection.mockRejectedValue(new Error('Register this extension debug token in Firebase App Check.'));
     await act(async () => button('Check AI connection').click());
