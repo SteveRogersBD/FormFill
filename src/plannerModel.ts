@@ -91,12 +91,14 @@ export async function planApplication(input: PlannerInput, progress?: (message: 
     },
     cloud: async (prompt) => {
       if (!input.allowCloud || !firebaseAppCheckReady) throw new Error('Cloud inference needs consent and Firebase App Check.');
+      try {
       const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), {
         mode: InferenceMode.ONLY_IN_CLOUD,
         inCloudParams: { model: import.meta.env.VITE_FIREBASE_AI_MODEL || 'gemini-3.5-flash-lite', generationConfig: { responseMimeType: 'application/json', responseSchema, maxOutputTokens: 32768 } },
       });
       const result = await deadline(model.generateContent(prompt), 60_000);
       return result.response.text();
+      } catch (reason) { throw aiSetupError(reason); }
     },
   }, progress); } finally { session?.destroy(); }
 }
