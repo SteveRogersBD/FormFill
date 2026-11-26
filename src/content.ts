@@ -129,7 +129,7 @@ function optionEquivalents(value: string) {
 
 function findOption(options: HTMLOptionElement[], value: string) {
   const equivalents = optionEquivalents(value);
-  return options.find((option) => equivalents.has(normalizeOption(option.text)) || equivalents.has(normalizeOption(option.value)));
+  return options.find((option) => equivalents.has(normalizeOption(option.label || option.text)) || equivalents.has(normalizeOption(option.value)));
 }
 
 function visibleControl(element: HTMLElement) {
@@ -210,7 +210,7 @@ function scanFields(): DetectedField[] {
     members.forEach((member) => member.setAttribute('data-applyai-field', id));
     if (groupKey) handledGroups.add(groupKey);
     const options = element instanceof HTMLSelectElement
-      ? [...element.options].filter((option) => option.value).map((option) => option.text.trim())
+      ? [...element.options].filter((option) => option.value).map((option) => (option.label || option.text).trim())
       : groupKey ? members.map((member) => optionLabel(member as HTMLInputElement)).filter(Boolean) : [];
     fields.push({
       id,
@@ -220,7 +220,7 @@ function scanFields(): DetectedField[] {
       required: members.some((member) => member.required || member.getAttribute('aria-required') === 'true') || Boolean(element.closest(questionContainer)?.querySelector('.ashby-application-form-question-title[class*="_required_"]')),
       options: options.length ? options : JSON.parse(element.getAttribute('data-applyai-options') || '[]'),
       section: cleanLabelText(element.closest('fieldset, section')?.querySelector('legend, h2, h3')?.textContent),
-      currentValue: element instanceof HTMLInputElement && element.type === 'radio' ? (members.find((member) => (member as HTMLInputElement).checked) ? optionLabel(members.find((member) => (member as HTMLInputElement).checked) as HTMLInputElement) : '') : element instanceof HTMLSelectElement ? element.selectedOptions[0]?.value ? element.selectedOptions[0].text : '' : element instanceof HTMLInputElement && element.type === 'checkbox' ? element.checked ? 'true' : '' : element.value,
+      currentValue: element instanceof HTMLInputElement && element.type === 'radio' ? (members.find((member) => (member as HTMLInputElement).checked) ? optionLabel(members.find((member) => (member as HTMLInputElement).checked) as HTMLInputElement) : '') : element instanceof HTMLSelectElement ? element.selectedOptions[0]?.value ? (element.selectedOptions[0].label || element.selectedOptions[0].text) : '' : element instanceof HTMLInputElement && element.type === 'checkbox' ? element.checked ? 'true' : '' : element.value,
       maxLength: element instanceof HTMLInputElement || element instanceof HTMLTextAreaElement ? element.maxLength >= 0 ? element.maxLength : undefined : undefined,
       min: element.getAttribute('min') || undefined,
       max: element.getAttribute('max') || undefined,
@@ -250,7 +250,7 @@ function scanChoiceGroups(startIndex: number): DetectedField[] {
     const buttons = [...group.querySelectorAll<HTMLElement>('button, [role="radio"]')]
       .filter((button) => {
         if (button instanceof HTMLButtonElement && (button.disabled || (button.form && button.type !== 'button'))) return false;
-        const text = cleanLabelText(button.textContent);
+        const text = controlLabel(button);
         return text.length > 0 && text.length <= 1000;
       });
     if (buttons.length < 2 || buttons.length > 200) continue;
@@ -267,8 +267,8 @@ function scanChoiceGroups(startIndex: number): DetectedField[] {
       description: descriptionFor(group),
       type: 'choice',
       required: group.getAttribute('aria-required') === 'true' || Boolean(group.closest(questionContainer)?.querySelector('[class*="_required_"]')),
-      options: buttons.map((button) => cleanLabelText(button.textContent)),
-      currentValue: buttons.filter(selectedChoice).length === 1 ? cleanLabelText(buttons.find(selectedChoice)?.textContent) : '',
+      options: buttons.map(controlLabel),
+      currentValue: buttons.filter(selectedChoice).length === 1 ? controlLabel(buttons.find(selectedChoice)!) : '',
       selector: `[data-applyai-field="${id}"]`,
     });
   }
@@ -303,8 +303,8 @@ async function scoutCustomOptions() {
       if (options.length) break;
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
-    element.setAttribute('data-applyai-options', JSON.stringify(options.map((option) => cleanLabelText(option.textContent)).filter(Boolean)));
-    element.setAttribute('data-applyai-current', cleanLabelText(options.find((option) => option.getAttribute('aria-selected') === 'true')?.textContent));
+    element.setAttribute('data-applyai-options', JSON.stringify(options.map(controlLabel).filter(Boolean)));
+    element.setAttribute('data-applyai-current', options.filter((option) => option.getAttribute('aria-selected') === 'true').map(controlLabel).join(' '));
     if (!wasOpen) {
       element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       if (element.getAttribute('aria-expanded') === 'true') activateControl(element);
@@ -356,13 +356,13 @@ async function pickListOption(element: HTMLElement, value: string) {
     // match for all saved components, never the first city with the same name.
     const parts = value.split(',').map((part) => optionEquivalents(part));
     const locations = options.filter((item) => {
-      const offered = (item.textContent ?? '').split(',').map((part) => normalizeOption(part));
+      const offered = controlLabel(item).split(',').map((part) => normalizeOption(part));
       return offered.length >= parts.length && parts.every((part, index) => part.has(offered[index]));
     });
-    const option = options.find((item) => wanted.has(normalizeOption(item.textContent ?? '')))
+    const option = options.find((item) => wanted.has(normalizeOption(controlLabel(item))))
       ?? (locations.length === 1 ? locations[0] : undefined);
     if (option) {
-      const offered = cleanLabelText(option.textContent);
+      const offered = controlLabel(option);
       activateControl(option);
       await new Promise((resolve) => setTimeout(resolve, 100));
       const selected = option.getAttribute('aria-selected') === 'true';
@@ -397,7 +397,7 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
       if (!first || !value || first.matches(':disabled, [aria-disabled="true"]')) continue;
       if (first.matches('button, [role="radio"]') && first.getAttribute('role') !== 'combobox' && first.getAttribute('aria-haspopup') !== 'listbox') {
         const wanted = optionEquivalents(value);
-        const choice = elements.find((element) => wanted.has(normalizeOption(element.textContent ?? '')));
+        const choice = elements.find((element) => wanted.has(normalizeOption(controlLabel(element))));
         if (!choice || (choice instanceof HTMLButtonElement && choice.form && choice.type !== 'button')) continue;
         activateControl(choice);
         checks.set(id, () => choice.isConnected && selectedChoice(choice) && !elements.some((peer) => peer !== choice && selectedChoice(peer)));
