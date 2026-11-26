@@ -259,7 +259,7 @@ function scanChoiceGroups(startIndex: number): DetectedField[] {
       type: 'choice',
       required: group.getAttribute('aria-required') === 'true' || Boolean(group.closest(questionContainer)?.querySelector('[class*="_required_"]')),
       options: buttons.map((button) => cleanLabelText(button.textContent)),
-      currentValue: cleanLabelText(buttons.find((button) => button.getAttribute('aria-pressed') === 'true' || button.getAttribute('aria-checked') === 'true')?.textContent),
+      currentValue: cleanLabelText(buttons.find(selectedChoice)?.textContent),
       selector: `[data-applyai-field="${id}"]`,
     });
   }
@@ -391,7 +391,7 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
         const choice = elements.find((element) => wanted.has(normalizeOption(element.textContent ?? '')));
         if (!choice || (choice instanceof HTMLButtonElement && choice.form && choice.type !== 'button')) continue;
         activateControl(choice);
-        checks.set(id, () => choice.isConnected && (choice.getAttribute('aria-pressed') === 'true' || choice.getAttribute('aria-checked') === 'true'));
+        checks.set(id, () => choice.isConnected && selectedChoice(choice));
         filled += 1;
         continue;
       }
@@ -435,6 +435,7 @@ async function fillFields(values: Record<string, string>, resume?: { fieldId: st
         continue;
       } else if (first instanceof HTMLInputElement || first instanceof HTMLTextAreaElement || first instanceof HTMLSelectElement) {
         first.focus();
+        if ((first.getAttribute('role') === 'combobox' || first.hasAttribute('aria-autocomplete')) && first.getAttribute('aria-expanded') !== 'true') activateControl(first);
         setValue(first, value);
         if (first.getAttribute('role') === 'combobox' || first.hasAttribute('aria-autocomplete')) {
           if (!await pickListOption(first, value)) continue;
