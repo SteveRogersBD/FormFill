@@ -170,6 +170,12 @@ function controlOptions(element: HTMLElement): HTMLElement[] {
   return groups.size === 1 ? options : [];
 }
 
+function selectedChoice(element: HTMLElement) {
+  return element.getAttribute('aria-pressed') === 'true' || element.getAttribute('aria-checked') === 'true'
+    || element.getAttribute('aria-selected') === 'true' || /^(checked|selected|on)$/.test(element.getAttribute('data-state') ?? '')
+    || /(?:^|[\s_-])(selected|checked|active)(?:[\s_-]|$)/i.test(element.className);
+}
+
 function scanFields(): DetectedField[] {
   const elements = [...document.querySelectorAll<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>('input, textarea, select')]
     .filter((element) => {
