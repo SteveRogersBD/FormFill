@@ -44,8 +44,9 @@ export async function runPlanner(input: PlannerInput, models: PlannerModels, pro
         entries.set(id, { ...entries.get(id)!, reason: 'AI did not return an answer for this question. Enter the missing answer here.' });
       }
       return { entries: [...entries.values()], attempts };
-    } catch {
-      return { attempts, warnings: [...state.warnings, `${source === 'ON_DEVICE' ? 'On-device' : 'Cloud'} AI failed or returned an invalid plan. Saved answers remain available. No second generation was attempted. Use “Analyze answers again” to explicitly make another request.`] };
+    } catch (reason) {
+      const setup = reason instanceof Error && reason.name === 'AISetupError' ? `${reason.message} ` : '';
+      return { attempts, warnings: [...state.warnings, `${setup}${source === 'ON_DEVICE' ? 'On-device' : 'Cloud'} AI failed or returned an invalid plan. Saved answers remain available. No second generation was attempted. Use “Analyze answers again” to explicitly make another request.`] };
     }
   };
   const graph = new StateGraph(State)
