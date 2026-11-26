@@ -56,6 +56,8 @@ function equivalentOption(value: string, options: string[]) {
     ['us', 'usa', 'unitedstates', 'unitedstatesofamerica'], ['uk', 'unitedkingdom', 'greatbritain'],
   ];
   const normalized = normalize(value);
+  const direct = options.filter((option) => normalize(option) === normalized);
+  if (direct.length === 1) return direct[0];
   const equivalent = new Set(aliases.find((group) => group.includes(normalized)) ?? [normalized]);
   const exact = options.filter((option) => equivalent.has(normalize(option)));
   if (exact.length === 1) return exact[0];
