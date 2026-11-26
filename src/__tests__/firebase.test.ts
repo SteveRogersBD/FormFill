@@ -41,6 +41,8 @@ describe('App Check initialization', () => {
     const firebase = await import('../firebase');
     await firebase.verifyAppCheck();
     expect(mocks.token).toHaveBeenCalledWith(instance, false);
+    await firebase.verifyAppCheck(true);
+    expect(mocks.token).toHaveBeenLastCalledWith(instance, true);
     expect(mocks.initialize).toHaveBeenCalledOnce();
   });
   it('uses a custom provider in debug mode without loading a remote script', async () => {
