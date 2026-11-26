@@ -45,6 +45,7 @@ function ControlledApplication() {
     <label htmlFor="essay">Why are you interested?</label><textarea id="essay" required value={values.essay ?? ''} onChange={(event) => setValues((current) => ({ ...current, essay: event.target.value }))} />
     <button type="submit">Submit application</button>
     <output aria-label="Accepted application values">{JSON.stringify(values)}</output>
+    <ControlledChoices />
   </form>;
 }
 afterEach(async () => {
@@ -80,14 +81,16 @@ describe('complete contact autofill integration', () => {
     const scan = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Scan and analyze with AI')!;
     await act(async () => scan.click());
     await act(async () => { await vi.waitFor(() => expect(modelWork.current, panel.textContent ?? '').toBeTruthy(), { timeout: 5000 }); await modelWork.current; });
+    await act(async () => { panel.querySelectorAll<HTMLInputElement>('.confirm-sensitive input').forEach((approval) => approval.click()); });
     const partial = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Fill prepared answers')!;
     expect(partial).toBeTruthy(); expect(partial.disabled, panel.textContent ?? '').toBe(false);
     await act(async () => partial.click());
-    await act(async () => { await vi.waitFor(() => expect(modelWork.fill).toBeTruthy(), { timeout: 5000 }); expect(await modelWork.fill).toMatchObject({ filled: 7, failed: [] }); });
+    await act(async () => { await vi.waitFor(() => expect(modelWork.fill).toBeTruthy(), { timeout: 5000 }); expect(await modelWork.fill).toMatchObject({ filled: 10, failed: [] }); });
     const accepted = JSON.parse(job.querySelector('output')!.textContent!);
     expect(accepted).toMatchObject({ 'Full name': 'Riley Example', 'First name': 'Riley', 'Last name': 'Example', Email: 'riley@example.test', Phone: '+15550101234', 'Zip code': '60601', LinkedIn: 'https://linkedin.com/in/riley-example' });
     expect(job.querySelector('textarea')!.value).toBe('');
-    expect(panel.textContent).toContain('Verified 7 fields');
+    expect(JSON.parse(job.querySelector('output[aria-label="Accepted choice values"]')!.textContent!)).toEqual({ gender: 'Man', veteran: 'none', arrangement: 'Hybrid' });
+    expect(panel.textContent).toContain('Verified 10 fields');
     expect(messages.filter((message: any) => message.type === 'APPLYAI_FILL_FIELDS')).toHaveLength(1);
   });
 });
