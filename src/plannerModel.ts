@@ -1,7 +1,7 @@
 import { getAI, getGenerativeModel, GoogleAIBackend, InferenceMode, Schema } from 'firebase/ai';
 import { z } from 'zod';
 import { getApp } from 'firebase/app';
-import { firebaseAppCheckReady, getFirebaseServices } from './firebase';
+import { firebaseAppCheckReady, getFirebaseServices, verifyAppCheck } from './firebase';
 import { runPlanner } from './plannerGraph';
 import { proposalSchema, type PlannerInput } from './planner';
 
@@ -36,8 +36,7 @@ export function aiSetupError(reason: unknown): Error {
 export async function checkAIConnection(): Promise<string> {
   if (!firebaseAppCheckReady) throw aiSetupError(new Error('App Check is not configured.'));
   await getFirebaseServices();
-  const { getAppCheck, getToken } = await import('firebase/app-check');
-  try { await deadline(getToken(getAppCheck(), false), 15_000); }
+  try { await deadline(verifyAppCheck(), 15_000); }
   catch { throw aiSetupError(new Error('App Check verification failed.')); }
   try {
     const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), {
