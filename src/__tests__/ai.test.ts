@@ -34,6 +34,16 @@ const profile = resumeProfileSchema.parse({
 });
 
 describe('cover letter drafting', () => {
+  it('uses approved cloud after invalid local extraction and rejects storage-path injection', async () => {
+    vi.stubGlobal('LanguageModel', { availability: async () => 'available' });
+    aiMocks.model.generateContent.mockResolvedValueOnce({ response: { text: () => 'not JSON' } }).mockResolvedValueOnce({ response: { text: () => JSON.stringify({ fullName: 'Riley', workExperience: [], projects: ['Alpha\nBuilt a planner.'] }) } });
+    expect((await extractResumeWithAI('Riley\nProjects\nAlpha\nBuilt a planner.', true)).source).toBe('IN_CLOUD');
+    expect(aiMocks.getGenerativeModel.mock.calls.map((call) => call[1].mode)).toEqual(['ONLY_ON_DEVICE', 'ONLY_IN_CLOUD']);
+    vi.stubGlobal('LanguageModel', undefined);
+    aiMocks.model.generateContent.mockResolvedValueOnce({ response: { text: () => JSON.stringify({ fullName: 'Riley', workExperience: [], resumePath: 'another-user/private.pdf' }) } });
+    await expect(extractResumeWithAI('Riley', true)).rejects.toThrow();
+  });
+
   it('never sends resume text to cloud without consent, including after a local failure', async () => {
     vi.stubGlobal('LanguageModel', undefined);
     await expect(extractResumeWithAI('Riley Example', false)).rejects.toThrow('Enable cloud resume extraction');
