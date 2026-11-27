@@ -45,6 +45,27 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe('AI side panel workflow', () => {
+  it('rejects changed page answers before dispatching an explicit submission', async () => {
+    let filled = false;
+    let changed = false;
+    mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => {
+      if (message.type === 'APPLYAI_FILL_FIELDS') { filled = true; return { filled: 2, failed: [] }; }
+      return { ...application, fields: application.fields.map((field) => ({ ...field, currentValue: filled ? field.id === 'a' ? changed ? 'Hybrid' : 'Remote' : 'No' : '' })) };
+    });
+    await act(async () => button('Scan and analyze with AI').click());
+    expect(button('Submit application').disabled).toBe(true);
+    await act(async () => (host.querySelector('.confirm-sensitive input') as HTMLInputElement).click());
+    await act(async () => button('Fill reviewed answers').click());
+    expect(button('Submit application').disabled).toBe(false);
+    changed = true;
+    await act(async () => button('Submit application').click());
+    expect(host.textContent).toContain('no longer match the page');
+    expect(mocks.message.mock.calls.some((call) => call[1].type === 'APPLYAI_SUBMIT_APPLICATION')).toBe(false);
+    const select = host.querySelectorAll('select')[0];
+    await act(async () => { select.value = 'Hybrid'; Simulate.change(select); });
+    expect(button('Submit application').disabled).toBe(true);
+  });
+
   it('copies the extension token and links its matching Firebase app without scanning or sending data', async () => {
     mocks.debug.mockResolvedValue({ token: 'fixture-secret', projectId: 'fixture-project', appId: 'fixture-web-app', consoleUrl: 'https://console.firebase.google.com/project/fixture-project/appcheck/apps?selectedAppId=fixture-web-app' });
     const writeText = vi.fn().mockResolvedValue(undefined);
