@@ -61,7 +61,6 @@ interface DeviceSession {
   inputQuota?: number;
   measureContextUsage?: (prompt: string, options: object) => Promise<number>;
   measureInputUsage?: (prompt: string, options: object) => Promise<number>;
-  prompt: (prompt: string, options: object) => Promise<string>;
   destroy: () => void;
 }
 interface DeviceProvider {
@@ -72,10 +71,10 @@ interface DeviceProvider {
 export async function planApplication(input: PlannerInput, progress?: (message: string) => void) {
   let session: DeviceSession | undefined;
   const constraint = z.toJSONSchema(proposalSchema);
+  const options = { expectedInputs: [{ type: 'text', languages: ['en'] }], expectedOutputs: [{ type: 'text', languages: ['en'] }] };
   try { return await runPlanner(input, {
     prepareDevice: async (prompt) => {
       const provider = (globalThis as typeof globalThis & { LanguageModel?: DeviceProvider }).LanguageModel;
-      const options = { expectedInputs: [{ type: 'text', languages: ['en'] }], expectedOutputs: [{ type: 'text', languages: ['en'] }] };
       if (!provider || await deadline(provider.availability(options), 5_000) !== 'available') return false;
       // This preflight measures the full request plus output schema without generating.
       // Never silently shorten the JD, resume or questions to fit a smaller model.
@@ -91,13 +90,25 @@ export async function planApplication(input: PlannerInput, progress?: (message: 
     },
     device: async (prompt) => {
       if (!session) throw new Error('The on-device model was not prepared.');
+      // Release the measurement session before Firebase creates its generation session.
+      session.destroy(); session = undefined;
       const controller = new AbortController();
-      try { return await deadline(session.prompt(prompt, { responseConstraint: constraint, signal: controller.signal }), 60_000); }
+      try {
+        await getFirebaseServices();
+        const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), {
+          mode: InferenceMode.ONLY_ON_DEVICE,
+          onDeviceParams: { createOptions: { ...options, signal: controller.signal }, promptOptions: { responseConstraint: constraint } },
+        });
+        await deadline(model.initializeDeviceModel(), 25_000);
+        const result = await deadline(model.generateContent(prompt, { signal: controller.signal }), 60_000);
+        return result.response.text();
+      }
       finally { controller.abort(); }
     },
     cloud: async (prompt) => {
       if (!input.allowCloud || !firebaseAppCheckReady) throw new Error('Cloud inference needs consent and Firebase App Check.');
       try {
+      await getFirebaseServices();
       const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), {
         mode: InferenceMode.ONLY_IN_CLOUD,
         inCloudParams: { model: import.meta.env.VITE_FIREBASE_AI_MODEL || 'gemini-3.5-flash-lite', generationConfig: { responseMimeType: 'application/json', responseSchema, maxOutputTokens: 32768 } },
