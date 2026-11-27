@@ -71,7 +71,7 @@ interface DeviceProvider {
 export async function planApplication(input: PlannerInput, progress?: (message: string) => void) {
   let session: DeviceSession | undefined;
   const constraint = z.toJSONSchema(proposalSchema);
-  const options = { expectedInputs: [{ type: 'text', languages: ['en'] }], expectedOutputs: [{ type: 'text', languages: ['en'] }] };
+  const options = { expectedInputs: [{ type: 'text' as const, languages: ['en'] }], expectedOutputs: [{ type: 'text' as const, languages: ['en'] }] };
   try { return await runPlanner(input, {
     prepareDevice: async (prompt) => {
       const provider = (globalThis as typeof globalThis & { LanguageModel?: DeviceProvider }).LanguageModel;
