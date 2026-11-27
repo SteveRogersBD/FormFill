@@ -13,6 +13,32 @@ const proposal = (fieldId: string, kind: Proposal['kind'], keys: string[], draft
 const response = (...answers: Proposal[]) => JSON.stringify({ answers });
 
 describe('application planning graph', () => {
+  it('resolves all three layers in order and protects earlier answers from later proposals', async () => {
+    const request = input([field('db', 'Email'), field('local', 'Networking profile'), field('cloud', 'Mail routing code'), field('unknown', 'Unfamiliar missing fact')], true);
+    const order: string[] = [];
+    const device = vi.fn().mockImplementation(async () => {
+      order.push('local');
+      return response(proposal('db', 'profile', ['city']), proposal('local', 'profile', ['linkedin']), proposal('cloud', 'profile', ['inventedKey']), proposal('unknown', 'unknown', []));
+    });
+    const cloud = vi.fn().mockImplementation(async () => {
+      order.push('cloud');
+      return response(proposal('db', 'profile', ['state']), proposal('local', 'profile', ['city']), proposal('cloud', 'profile', ['postalCode']), proposal('unknown', 'unknown', []));
+    });
+    const result = await runPlanner(request, { prepareDevice: async () => true, device, cloud });
+    expect(order).toEqual(['local', 'cloud']);
+    expect(result.attempts).toEqual(['ON_DEVICE', 'IN_CLOUD']);
+    expect(result.entries.map(({ value, source }) => [value, source])).toEqual([
+      ['jordan@example.com', 'saved'], ['https://linkedin.com/in/jordan', 'ON_DEVICE'], ['60601', 'IN_CLOUD'], ['', 'saved'],
+    ]);
+    const localData = JSON.parse(device.mock.calls[0][0].split('DATA:\n')[1]);
+    const cloudData = JSON.parse(cloud.mock.calls[0][0].split('DATA:\n')[1]);
+    expect(localData.targetIds).toEqual(['local', 'cloud', 'unknown']);
+    expect(cloudData.targetIds).toEqual(['cloud', 'unknown']);
+    expect(cloudData.fields).toHaveLength(4);
+    expect(cloudData.fixedAnswers.map(({ fieldId }: { fieldId: string }) => fieldId)).toEqual(['db', 'local']);
+    expect(device).toHaveBeenCalledOnce(); expect(cloud).toHaveBeenCalledOnce();
+  });
+
   it('uses saved answers for equivalent dropdown and Yes/No option wording without AI', async () => {
     const request = input([field('1', 'Gender', 'select', ['Man', 'Woman']), field('2', 'Country', 'select', ['USA', 'Canada']), field('3', 'Do you require sponsorship?', 'choice', ['Yes, I require sponsorship', 'No, I do not require sponsorship'])]);
     request.profile.country = 'United States'; request.preferences.gender = 'Male'; request.preferences.eeoOptIn = true;
