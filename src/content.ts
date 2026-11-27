@@ -304,7 +304,9 @@ async function scoutCustomOptions() {
       await new Promise((resolve) => setTimeout(resolve, 100));
     }
     element.setAttribute('data-applyai-options', JSON.stringify(options.map(controlLabel).filter(Boolean)));
-    element.setAttribute('data-applyai-current', options.filter((option) => option.getAttribute('aria-selected') === 'true').map(controlLabel).join(' '));
+    const selected = options.filter((option) => option.getAttribute('aria-selected') === 'true').map(controlLabel).join(' ');
+    const displayed = element instanceof HTMLInputElement ? element.value : cleanLabelText(element.textContent);
+    element.setAttribute('data-applyai-current', selected || (options.some((option) => controlLabel(option) === displayed) ? displayed : ''));
     if (!wasOpen) {
       element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
       if (element.getAttribute('aria-expanded') === 'true') activateControl(element);
