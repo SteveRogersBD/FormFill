@@ -27,7 +27,17 @@ export async function saveResume(file: File, profile: ResumeProfile, uid: string
   const path = `resumes/${uid}/${Date.now()}-${safeName}`;
   const savedProfile = resumeProfileSchema.parse({ ...profile, resumePath: path, updatedAt: Date.now() });
   const newResume = ref(storage, path);
-  await uploadBytes(newResume, file, { contentType: 'application/pdf' });
+  try { await uploadBytes(newResume, file, { contentType: 'application/pdf' }); }
+  catch (reason) {
+    const code = reason && typeof reason === 'object' && 'code' in reason ? String(reason.code) : '';
+    const response = reason && typeof reason === 'object' && 'serverResponse' in reason ? String(reason.serverResponse) : '';
+    if (code === 'storage/bucket-not-found' || code === 'storage/no-default-bucket' || (code === 'storage/unknown' && /"code"\s*:\s*404/.test(response))) {
+      throw new Error('The resume PDF was not uploaded because the Firebase Storage bucket is unavailable. Complete Storage setup for this project, or choose Save profile only to save your reviewed fields without a PDF.', { cause: reason });
+    }
+    if (code === 'storage/unauthorized') throw new Error('Firebase denied the PDF upload. Check Storage rules and App Check for this project, or choose Save profile only. Your imported details are still available.', { cause: reason });
+    if (code === 'storage/retry-limit-exceeded') throw new Error('The resume upload timed out. Check network access and Storage setup, or choose Save profile only. Your imported details are still available.', { cause: reason });
+    throw reason;
+  }
   try {
     await setDoc(doc(db, 'users', uid, 'profile', 'current'), savedProfile);
   } catch (error) {
