@@ -9,10 +9,10 @@
 | UI | React + Vite | Sign-in, resume upload, editable profile dashboard, side panel, review and history |
 | Styling | CSS | UI components and layout |
 | Form access | Chrome content scripts + DOM APIs | Detect, inspect and fill application fields on user activation |
-| Workflow | LangGraph.js + LangChain Core runnables | Coordinate saved facts, provider preflight, one batch generation and review |
-| Hybrid AI | Chrome Prompt API + Firebase AI Logic | Select a ready provider before generating |
-| On-device model | Chrome Prompt API with capacity measurement | Private semantic matching and grounded drafting |
-| Cloud model | Gemini via Firebase AI Logic | Approved alternative selected before generation |
+| Workflow | LangGraph.js + LangChain Core runnables | Coordinate saved facts, local AI, approved cloud AI and review |
+| Hybrid AI | Firebase AI Logic | Generate locally first, then resolve remaining questions in approved cloud AI |
+| On-device model | Firebase AI Logic `ONLY_ON_DEVICE`, Chrome capacity measurement | Private semantic matching and grounded drafting |
+| Cloud model | Gemini via Firebase AI Logic | Resolve questions left unanswered by local AI |
 | Validation | Zod | Validate extracted profile and AI output schemas |
 | Resume parsing | PDF.js (`pdfjs-dist`) | Extract text from uploaded PDF |
 | Cloud file storage | Google Cloud Storage for Firebase | Store original resume PDFs in user-scoped paths |
@@ -68,10 +68,10 @@ Exact facts such as name, email, phone, university, and graduation date should u
 
 ## Implementation decisions
 
-- The application planner runs in the extension using `src/plannerGraph.ts`, with Chrome on-device and Firebase cloud adapters in `src/plannerModel.ts` and fact/evidence validation in `src/planner.ts`. No custom backend is required. The Python session API remains a separate prototype.
+- The application planner runs in the extension using `src/plannerGraph.ts`, with Firebase AI Logic on-device and cloud adapters in `src/plannerModel.ts` and fact/evidence validation in `src/planner.ts`. No custom backend is required. The Python session API remains a separate prototype.
 - Build sign-in, PDF upload, profile extraction/review/dashboard, and a controlled test form before expanding platform coverage.
-- Device selection checks Prompt API availability and measures the complete request and response schema against session capacity, with output reserve. Unready or too-small device models route to approved cloud before generation. Failed generations never trigger automatic retries. Live availability still needs verification on the target Chrome/Firebase installation.
-- `src/applicationWorkspace.ts` validates account-scoped Chrome session snapshots, serializes writes, restores edits/approvals/context and checks required-answer readiness. Filling compares stable question snapshots and verifies accepted widget state.
+- Device selection checks Prompt API availability and measures the complete request and response schema against session capacity, with output reserve. Unready or too-small device models route to approved cloud before generation. Missing or invalid local answers and local failures continue once to approved cloud AI. Earlier saved and accepted local answers remain fixed; neither model retries automatically. Live availability still needs verification on the target Chrome/Firebase installation.
+- `src/applicationWorkspace.ts` validates account-scoped Chrome session snapshots, serializes writes, restores edits/approvals/context and submission-request state, and checks required-answer readiness. Filling compares stable question snapshots and verifies accepted widget state. The separate Submit application action rechecks current answers and form validity, targets one identifiable final submit button, and requires site confirmation before recording success.
 - Prompts include the full extracted JD and resume, reviewed profile and permitted standing facts. Saved EEO facts require sharing opt-in. Factual values resolve from saved keys; drafts and semantic option mappings require review.
 - Verify App Check and Firestore/Storage rules in the target extension deployment before enabling cloud features.
 - Pin dependencies at implementation time. Keep the AI provider behind a typed interface so the workflow can be tested without a live model.
