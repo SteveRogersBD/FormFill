@@ -107,6 +107,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   const [notice, setNotice] = useState('');
   const [siteAccessRequest, setSiteAccessRequest] = useState<{ pattern: string; hostname: string } | null>(null);
   const [filled, setFilled] = useState(false);
+  const [submissionRequested, setSubmissionRequested] = useState(false);
   const [cloudConsent, setCloudConsent] = useState(false);
   const [inferenceSource, setInferenceSource] = useState('');
   const [plan, setPlan] = useState<PlannerResult | null>(null);
@@ -124,6 +125,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   owner.current = user.uid;
 
   const editAnswer = (id: string, value: string) => {
+    setFilled(false);
     editedFields.current.add(id);
     setValues((current) => ({ ...current, [id]: value }));
     setConfirmed((current) => ({ ...current, [id]: false }));
@@ -132,6 +134,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
 
   const changeContext = (key: 'description' | 'resumeText', text: string) => {
     if (!scan) return;
+    setFilled(false);
     if (key === 'description') setScan({ ...scan, description: text, contextWarning: undefined });
     else { setResumeText(text); resumeSource.current = profile.resumePath; }
     setConfirmed({}); setOutcomes({});
@@ -140,6 +143,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   };
 
   const analyze = async (application: ApplicationScan, currentProfile: ResumeProfile, currentPreferences: Preferences, fullResumeText: string) => {
+    setFilled(false);
     const token = operation.current;
     const uid = user.uid;
     const input = {
@@ -187,10 +191,11 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   useEffect(() => {
     let cancelled = false;
     operation.current += 1;
-    setRestored(false); setScan(null); setPlan(null); setValues({}); setConfirmed({}); setManualDone({}); setOutcomes({}); setResumeText(''); setCloudConsent(false); setBusy(false); setStale(false); editedFields.current.clear(); resumeSource.current = '';
+    setRestored(false); setScan(null); setPlan(null); setValues({}); setConfirmed({}); setManualDone({}); setOutcomes({}); setResumeText(''); setCloudConsent(false); setBusy(false); setStale(false); setSubmissionRequested(false); setFilled(false); editedFields.current.clear(); resumeSource.current = '';
     void loadWorkspace(user.uid).then((workspace) => {
       if (cancelled || !workspace) return;
       setScan(workspace.scan); setPlan(workspace.plan); setValues(workspace.values); setConfirmed(workspace.confirmed); setManualDone(workspace.manualDone); setResumeText(workspace.resumeText); setOutcomes(workspace.outcomes); setCompany(workspace.company); setRole(workspace.role);
+      setSubmissionRequested(Boolean(workspace.submissionRequested));
       editedFields.current = new Set(workspace.edited);
       resumeSource.current = workspace.resumePath ?? '';
       setNotice('Restored your temporary application workspace. Review it before filling.');
@@ -201,13 +206,14 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
   useEffect(() => {
     if (!restored || !scan || scan.tabId === undefined || busy) return;
     let cancelled = false;
-    void saveWorkspace({ version: 1, uid: user.uid, tabId: scan.tabId, scan, plan, values, confirmed, manualDone, edited: [...editedFields.current], company, role, resumeText, resumePath: resumeSource.current, outcomes, updatedAt: Date.now() }).catch(() => { if (!cancelled) setError('The workspace could not be saved for this session. Keep this panel open to retain your answers.'); });
+    void saveWorkspace({ version: 1, uid: user.uid, tabId: scan.tabId, scan, plan, values, confirmed, manualDone, edited: [...editedFields.current], company, role, resumeText, resumePath: resumeSource.current, outcomes, submissionRequested, updatedAt: Date.now() }).catch(() => { if (!cancelled) setError('The workspace could not be saved for this session. Keep this panel open to retain your answers.'); });
     return () => { cancelled = true; };
-  }, [restored, scan, plan, values, confirmed, manualDone, company, role, resumeText, outcomes, busy, user.uid]);
+  }, [restored, scan, plan, values, confirmed, manualDone, company, role, resumeText, outcomes, submissionRequested, busy, user.uid]);
 
   const discard = async () => {
     operation.current += 1;
     setScan(null); setPlan(null); setValues({}); setConfirmed({}); setManualDone({}); setResumeText(''); setOutcomes({}); setInferenceSource(''); setStale(false); editedFields.current.clear();
+    setSubmissionRequested(false); setFilled(false);
     await clearWorkspace(user.uid);
     setNotice('Temporary application discarded.');
   };
@@ -249,7 +255,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       }
       if (token !== operation.current || owner.current !== uid) return;
       // Keep edits only for stable questions on the same application tab.
-      if (scan?.url !== result.url || scan?.tabId !== result.tabId) editedFields.current.clear();
+      if (scan?.url !== result.url || scan?.tabId !== result.tabId) { editedFields.current.clear(); setSubmissionRequested(false); }
       setScan(result); setResumeText(fullResumeText); resumeSource.current = currentProfile.resumePath; setPlan(null); setManualDone({});
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
