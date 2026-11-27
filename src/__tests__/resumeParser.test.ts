@@ -56,7 +56,7 @@ describe('extractProfileFromText', () => {
       graduationDate: 'May 2026',
       skills: ['TypeScript', 'React', 'Accessibility'],
       workExperience: [{ jobTitle: 'Product Designer', company: 'Northstar Studio', description: ['Led user research and prototyping.'] }],
-      projects: ['Application Tracker', 'Built a job search dashboard.'],
+      projects: ['Application Tracker\nBuilt a job search dashboard.'],
       achievements: ['Design Challenge Winner', 'Recognized for inclusive product design.'],
     });
   });
@@ -105,7 +105,7 @@ describe('extractProfileFromText', () => {
       graduationDate: 'May 2027',
       skills: ['TypeScript', 'React', 'Accessibility'],
       workExperience: [{ jobTitle: 'Designer', company: 'Example Studio', description: ['Led user research and prototyping.'] }],
-      projects: ['Application Assistant', 'Built a form autofill prototype.'],
+      projects: ['Application Assistant\nBuilt a form autofill prototype.'],
       achievements: ['Design Fellowship'],
     });
   });
