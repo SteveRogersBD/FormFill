@@ -50,7 +50,7 @@ export async function runPlanner(input: PlannerInput, models: PlannerModels, pro
       return { entries: [...entries.values()], attempts };
     } catch (reason) {
       const setup = reason instanceof Error && reason.name === 'AISetupError' ? `${reason.message} ` : '';
-      return { attempts, warnings: [...state.warnings, `${setup}${source === 'ON_DEVICE' ? 'On-device' : 'Cloud'} AI failed or returned an invalid plan. Saved answers remain available. No second generation was attempted. Use “Analyze answers again” to explicitly make another request.`] };
+      return { attempts, warnings: [...state.warnings, `${setup}${source === 'ON_DEVICE' ? 'On-device' : 'Cloud'} AI failed or returned an invalid plan. Previously prepared answers remain available.${source === 'ON_DEVICE' && input.allowCloud ? ' Approved cloud AI will try the remaining questions.' : ' Enter missing answers yourself or use “Analyze answers again” to retry.'}`] };
     }
   };
   const graph = new StateGraph(State)
@@ -70,6 +70,12 @@ export async function runPlanner(input: PlannerInput, models: PlannerModels, pro
       return { source: null, warnings: ['The on-device model is unavailable or cannot fit the complete application. Allow cloud AI and analyze again, or enter the missing answers yourself. No AI generation was made.'] };
     })
     .addNode('on_device', infer('ON_DEVICE'))
+    .addNode('select_cloud', (state) => {
+      const targets = unresolvedIds(input, state.entries);
+      if (!targets.length) return { source: null };
+      if (input.allowCloud) return { source: 'IN_CLOUD' as const, prompt: makePlannerPrompt(input, targets, state.entries) };
+      return { source: null, warnings: [...state.warnings, 'Some questions remain unanswered after on-device AI. Allow cloud AI and analyze again, or enter the missing answers yourself.'] };
+    })
     .addNode('cloud', infer('IN_CLOUD'))
     .addNode('review', (state) => {
       progress('Checking evidence and preparing answers for review…');
@@ -79,11 +85,12 @@ export async function runPlanner(input: PlannerInput, models: PlannerModels, pro
     .addEdge(START, 'saved_facts')
     .addEdge('saved_facts', 'select_provider')
     .addConditionalEdges('select_provider', (state) => state.source === 'ON_DEVICE' ? 'on_device' : state.source === 'IN_CLOUD' ? 'cloud' : 'review', ['on_device', 'cloud', 'review'])
-    .addEdge('on_device', 'review')
+    .addEdge('on_device', 'select_cloud')
+    .addConditionalEdges('select_cloud', (state) => state.source === 'IN_CLOUD' ? 'cloud' : 'review', ['cloud', 'review'])
     .addEdge('cloud', 'review')
     .addEdge('review', END)
     .compile();
   // No remote checkpointer or tracing service: graph state stays in this panel session.
-  const result = await graph.invoke({ input, entries: [], warnings: [], attempts: [], source: null, prompt: '' }, { recursionLimit: 8 });
+  const result = await graph.invoke({ input, entries: [], warnings: [], attempts: [], source: null, prompt: '' }, { recursionLimit: 10 });
   return { entries: result.entries, warnings: result.warnings, attempts: result.attempts };
 }
