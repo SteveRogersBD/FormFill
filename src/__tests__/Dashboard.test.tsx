@@ -35,6 +35,31 @@ async function renderDashboard() {
 }
 
 describe('dashboard profile editors', () => {
+  it('reviews separate AI jobs and projects and saves their fields after PDF upload fails', async () => {
+    const parsed = { ...emptyProfile(), fullName: 'Riley Example', workExperience: ['First Studio', 'Second Lab', 'Third Company'].map((company, index) => workExperienceSchema.parse({ id: `role-${index}`, company, jobTitle: 'Engineer', description: [`Built tools at ${company}.`] })), projects: ['Alpha\nPlanning tool.', 'Beta\nTutor.', 'Gamma\nRecipe tool.'] };
+    mocks.extract.mockResolvedValue({ profile: parsed, source: 'ON_DEVICE' });
+    mocks.saveResume.mockRejectedValueOnce(new Error('Storage bucket is unavailable.'));
+    const { host, root } = await renderDashboard();
+    try {
+      const file = new File(['fixture'], 'resume.pdf', { type: 'application/pdf' });
+      Object.defineProperty(file, 'arrayBuffer', { value: async () => new ArrayBuffer(8) });
+      await act(async () => Simulate.change(host.querySelector('input[type="file"]')!, { target: { files: [file] } } as any));
+      await act(async () => { await vi.waitFor(() => expect(mocks.parse).toHaveBeenCalledOnce()); });
+      const button = (text: string) => [...host.querySelectorAll('button')].find((item) => item.textContent === text)!;
+      await act(async () => button('Extract resume with AI').click());
+      expect(mocks.extract).toHaveBeenCalledWith('Full fixture resume with three jobs and projects.', false);
+      expect(host.querySelectorAll('#experience .timeline-entry')).toHaveLength(3);
+      expect(host.textContent).toContain('3 work experience entries and 3 projects');
+      await act(async () => button('Save imported resume').click());
+      expect(host.querySelector('[role="alert"]')!.textContent).toContain('Storage bucket is unavailable');
+      expect(mocks.saveProfile).not.toHaveBeenCalled();
+      await act(async () => button('Save profile only').click());
+      expect(mocks.saveProfile).toHaveBeenCalledWith(expect.objectContaining({ workExperience: parsed.workExperience, projects: parsed.projects, resumePath: '' }), 'test-user');
+      expect(host.textContent).toContain('saved to Firestore');
+      expect(mocks.saveResume).toHaveBeenCalledOnce();
+    } finally { await act(async () => root.unmount()); host.remove(); }
+  });
+
   it('blocks edits if existing preferences cannot be loaded', async () => {
     mocks.loadPreferences.mockRejectedValueOnce(new Error('Permission denied while loading existing answers.'));
     const { host, root } = await renderDashboard();
