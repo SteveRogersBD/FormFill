@@ -30,6 +30,10 @@ const workspaceSchema = z.object({
 });
 let writes: Promise<unknown> = Promise.resolve();
 
+export function applicationFingerprint(application: Pick<ApplicationScan, 'fields'>) {
+  return JSON.stringify(application.fields.map(({ id, label, type, required, options, maxLength, min, max, pattern }) => ({ id, label, type, required, options: ['select', 'radio', 'choice'].includes(type) ? [...options].sort() : [], maxLength, min, max, pattern })));
+}
+
 export function saveWorkspace(workspace: ApplicationWorkspace): Promise<void> {
   const snapshot = workspaceSchema.parse(workspace);
   const saving = writes.catch(() => undefined).then(async () => {
