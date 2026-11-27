@@ -8,7 +8,7 @@ import { emptyPreferences, PREFERENCE_FIELDS, type Preferences } from './prefere
 import { matchQuestion, questionAnswer } from './questions';
 import { firebaseAppCheckReady } from './firebase';
 import { completeJobContext, hostPermissionPattern, type ApplicationScan } from './applicationPage';
-import { applicationReadiness, clearWorkspace, loadWorkspace, prepareFill, saveWorkspace } from './applicationWorkspace';
+import { applicationFingerprint, applicationReadiness, clearWorkspace, loadWorkspace, prepareFill, saveWorkspace } from './applicationWorkspace';
 import type { AppCheckDebugDetails } from './appCheckDebug';
 
 async function getActiveApplicationTab() {
@@ -285,7 +285,6 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       if (!allowPartial && applicationReadiness(scan, plan, values, confirmed, manualDone, Boolean(profile.resumePath)).some((item) => item.blocking)) throw new Error('Some required answers are not ready. Review them, or choose “Fill prepared answers” to enter only the answers that are ready.');
       const tab = await getActiveApplicationTab();
       if (tab.url !== scan.url || tab.id !== scan.tabId) throw new Error('The active application tab changed. Return to the scanned tab or scan again before filling.');
-      const fingerprint = (application: ApplicationScan) => JSON.stringify(application.fields.map(({ id, label, type, required, options, maxLength, min, max, pattern }) => ({ id, label, type, required, options: ['select', 'radio', 'choice'].includes(type) ? [...options].sort() : [], maxLength, min, max, pattern })));
       const before = await rescanApplicationFrames(tab.id, scan);
       const prepared = prepareFill(scan, before, plan, values, confirmed);
       const valuesByFrame = new Map<number, Record<string, string>>();
@@ -326,7 +325,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       if (failedCount || prepared.skipped.length || resumeError || transportErrors.length) setError([resumeError, ...transportErrors, failedCount ? `${failedCount} control(s) could not be verified. Review the field results below.` : '', prepared.skipped.length ? `${prepared.skipped.length} answer(s) were skipped because they need approval or their controls changed. Other prepared answers were still attempted.` : ''].filter(Boolean).join(' '));
       setNotice(filledCount ? `Verified ${filledCount} field${filledCount === 1 ? '' : 's'}. Check the application before continuing.` : 'No answers could be verified. Review the field results below.');
       const after = await rescanApplicationFrames(tab.id, before);
-      if (fingerprint(after) !== fingerprint(before)) {
+      if (applicationFingerprint(after) !== applicationFingerprint(before)) {
         setStale(true);
         setNotice('Filling revealed new or changed questions. Scan again to prepare the next application snapshot; your edits to matching questions will be kept.');
       }
