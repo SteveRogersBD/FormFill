@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ initialize: vi.fn(), token: vi.fn(), custom: v
 vi.mock('firebase/app', () => ({ initializeApp: () => ({ name: 'test' }) }));
 vi.mock('firebase/auth', () => ({ getAuth: () => ({}) }));
 vi.mock('firebase/firestore', () => ({ getFirestore: () => ({}) }));
-vi.mock('firebase/storage', () => ({ getStorage: () => ({}), setMaxUploadRetryTime: vi.fn() }));
+vi.mock('firebase/storage', () => ({ getStorage: () => ({ maxUploadRetryTime: 600_000 }) }));
 vi.mock('firebase/app-check', async (original) => {
   const sdk = await original<typeof import('firebase/app-check')>();
   return {
@@ -39,6 +39,7 @@ describe('App Check initialization', () => {
     const instance = { app: { name: 'test' } };
     mocks.initialize.mockReturnValue(instance); mocks.token.mockResolvedValue({ token: 'fixture-token' });
     const firebase = await import('../firebase');
+    expect((await firebase.getFirebaseServices()).storage.maxUploadRetryTime).toBe(30_000);
     await firebase.verifyAppCheck();
     expect(mocks.token).toHaveBeenCalledWith(instance, false);
     await firebase.verifyAppCheck(true);
