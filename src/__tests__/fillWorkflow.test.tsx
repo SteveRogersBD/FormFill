@@ -42,12 +42,13 @@ function ControlledChoices() {
   </>;
 }
 
-function ControlledApplication() {
+function ControlledApplication({ withAiQuestions = false }: { withAiQuestions?: boolean }) {
   const [values, setValues] = useState<Record<string, string>>({});
-  return <form onSubmit={(event) => { event.preventDefault(); throw new Error('Autofill must never submit.'); }}>
+  return <form onSubmit={(event) => { event.preventDefault(); modelWork.submit(); }}>
     <div data-job-description>Build test and automation tools using TypeScript. This is fixture job context.</div>
     {[['Full name', 'text'], ['First name', 'text'], ['Last name', 'text'], ['Email', 'email'], ['Phone', 'tel'], ['Zip code', 'text'], ['LinkedIn', 'url']].map(([label, type]) => <div className="ashby-application-form-field-entry" key={label}><label className="ashby-application-form-question-title" htmlFor={label}>{label}</label><input id={label} type={type} required value={values[label] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [label]: event.target.value }))} /></div>)}
     <label htmlFor="essay">Why are you interested?</label><textarea id="essay" required value={values.essay ?? ''} onChange={(event) => setValues((current) => ({ ...current, essay: event.target.value }))} />
+    {withAiQuestions && ['Networking profile', 'Mail routing code'].map((label) => <label key={label}>{label}<input required value={values[label] ?? ''} onChange={(event) => setValues((current) => ({ ...current, [label]: event.target.value }))} /></label>)}
     <button type="submit">Submit application</button>
     <output aria-label="Accepted application values">{JSON.stringify(values)}</output>
     <ControlledChoices />
