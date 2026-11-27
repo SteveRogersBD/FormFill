@@ -34,6 +34,18 @@ const profile = resumeProfileSchema.parse({
 });
 
 describe('cover letter drafting', () => {
+  it('never sends resume text to cloud without consent, including after a local failure', async () => {
+    vi.stubGlobal('LanguageModel', undefined);
+    await expect(extractResumeWithAI('Riley Example', false)).rejects.toThrow('Enable cloud resume extraction');
+    expect(aiMocks.getGenerativeModel).not.toHaveBeenCalled();
+    vi.stubGlobal('LanguageModel', { availability: async () => 'available' });
+    aiMocks.model.generateContent.mockRejectedValueOnce(new Error('Local context is too small.'));
+    await expect(extractResumeWithAI('Riley Example', false)).rejects.toThrow('Local context is too small');
+    expect(aiMocks.getGenerativeModel).toHaveBeenCalledOnce();
+    expect(aiMocks.getGenerativeModel.mock.calls[0][1].mode).toBe('ONLY_ON_DEVICE');
+    expect(aiMocks.model.initializeDeviceModel).toHaveBeenCalledOnce();
+  });
+
   it('extracts three separate jobs and projects in approved cloud AI using the complete resume', async () => {
     vi.stubGlobal('LanguageModel', undefined);
     aiMocks.getGenerativeModel.mockReturnValue(aiMocks.model);
