@@ -50,6 +50,7 @@ describe('dashboard profile editors', () => {
   });
 
   it('reviews separate AI jobs and projects and saves their fields after PDF upload fails', async () => {
+    mocks.parse.mockResolvedValue({ ...emptyProfile(), fullName: 'Riley Example', linkedin: 'https://linkedin.com/in/riley' });
     const parsed = { ...emptyProfile(), fullName: 'Riley Example', workExperience: ['First Studio', 'Second Lab', 'Third Company'].map((company, index) => workExperienceSchema.parse({ id: `role-${index}`, company, jobTitle: 'Engineer', description: [`Built tools at ${company}.`] })), projects: ['Alpha\nPlanning tool.', 'Beta\nTutor.', 'Gamma\nRecipe tool.'] };
     mocks.extract.mockResolvedValue({ profile: parsed, source: 'ON_DEVICE' });
     mocks.saveResume.mockRejectedValueOnce(new Error('Storage bucket is unavailable.'));
@@ -68,7 +69,7 @@ describe('dashboard profile editors', () => {
       expect(host.querySelector('[role="alert"]')!.textContent).toContain('Storage bucket is unavailable');
       expect(mocks.saveProfile).not.toHaveBeenCalled();
       await act(async () => button('Save profile only').click());
-      expect(mocks.saveProfile).toHaveBeenCalledWith(expect.objectContaining({ workExperience: parsed.workExperience, projects: parsed.projects, resumePath: '' }), 'test-user');
+      expect(mocks.saveProfile).toHaveBeenCalledWith(expect.objectContaining({ workExperience: parsed.workExperience, projects: parsed.projects, linkedin: 'https://linkedin.com/in/riley', resumePath: '' }), 'test-user');
       expect(host.textContent).toContain('saved to Firestore');
       expect(mocks.saveResume).toHaveBeenCalledOnce();
     } finally { await act(async () => root.unmount()); host.remove(); }
