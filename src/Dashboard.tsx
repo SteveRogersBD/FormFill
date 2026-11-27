@@ -144,7 +144,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
       const [{ extractResumeText }, { extractResumeWithAI }] = await Promise.all([import('./resumeParser'), import('./ai')]);
       const text = await extractResumeText(await file.arrayBuffer());
       const result = await extractResumeWithAI(text, resumeCloudConsent);
-      setProfile({ ...result.profile, resumePath: profile.resumePath });
+      setProfile((current) => ({ ...result.profile, linkedin: result.profile.linkedin || current.linkedin, portfolio: result.profile.portfolio || current.portfolio, resumePath: current.resumePath }));
       setMessage(`AI extracted ${result.profile.workExperience.length} work experience entries and ${result.profile.projects.length} projects ${result.source === 'ON_DEVICE' ? 'on your device' : 'in the approved cloud model'}. Review all details before saving.`);
     } catch (reason) { setMessage(''); setError(reason instanceof Error ? reason.message : 'AI extraction failed. Your imported details are still available.'); }
     finally { setWorking(false); }
