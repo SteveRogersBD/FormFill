@@ -276,7 +276,7 @@ function scanChoiceGroups(startIndex: number): DetectedField[] {
 }
 
 function applicationFrameOrigins(): string[] {
-  const knownAtsHost = /(^|\.)(greenhouse\.io|ashbyhq\.com|lever\.co|myworkdayjobs\.com|smartrecruiters\.com|jobvite\.com|icims\.com|bamboohr\.com|workable\.com)$/i;
+  const knownAtsHost = /(^|\.)(greenhouse\.io|ashbyhq\.com|lever\.co|myworkdayjobs\.com|smartrecruiters\.com|jobvite\.com|icims\.com|bamboohr\.com|workable\.com|recruitingbypaycor\.com)$/i;
   const applicationHint = /greenhouse|ashby|lever|workday|smartrecruiters|jobvite|icims|bamboohr|workable|job.?application|application.?form|apply.?form/i;
   return [...new Set([...document.querySelectorAll<HTMLIFrameElement>('iframe[src]')].flatMap((frame) => {
     try {
