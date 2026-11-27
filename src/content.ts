@@ -531,6 +531,10 @@ if (!contentWorld.__applyAiPageListenerInstalled) {
     if (message?.type === 'APPLYAI_FILL_FIELDS') {
       fillFields(message.values ?? {}, message.resume).then(sendResponse).catch(() => sendResponse({ filled: 0, failed: Object.keys(message.values ?? {}) }));
     }
+    if (message?.type === 'APPLYAI_SUBMIT_APPLICATION') {
+      try { sendResponse(submitApplication(message.fields ?? [])); }
+      catch (reason) { sendResponse({ requested: false, error: reason instanceof Error ? reason.message : 'Could not submit this application.' }); }
+    }
     return true;
   });
 }
