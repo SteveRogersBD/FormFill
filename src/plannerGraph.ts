@@ -16,6 +16,10 @@ const State = Annotation.Root({
   prompt: Annotation<string>(),
 });
 
+function unresolvedIds(input: PlannerInput, entries: PlanEntry[]) {
+  return entries.filter((entry) => !entry.value && canPlan(input.fields.find((field) => field.id === entry.fieldId)!)).map((entry) => entry.fieldId);
+}
+
 export async function runPlanner(input: PlannerInput, models: PlannerModels, progress: (message: string) => void = () => {}): Promise<PlannerResult> {
   const chains = {
     ON_DEVICE: RunnableLambda.from(models.device).pipe(RunnableLambda.from(parseProposals)),
@@ -23,7 +27,7 @@ export async function runPlanner(input: PlannerInput, models: PlannerModels, pro
   };
   const infer = (source: InferenceSource) => async (state: typeof State.State) => {
     progress(source === 'ON_DEVICE' ? 'Analyzing this application on your device…' : 'Analyzing unresolved questions in the approved cloud model…');
-    const targets = state.entries.filter((entry) => !entry.value && canPlan(input.fields.find((field) => field.id === entry.fieldId)!)).map((entry) => entry.fieldId);
+    const targets = unresolvedIds(input, state.entries);
     if (!targets.length) return {};
     const attempts = [...state.attempts, source];
     try {
@@ -55,7 +59,7 @@ export async function runPlanner(input: PlannerInput, models: PlannerModels, pro
       return { entries: savedPlan(input), attempts: [], warnings: [] };
     })
     .addNode('select_provider', async (state) => {
-      const targets = state.entries.filter((entry) => !entry.value && canPlan(input.fields.find((field) => field.id === entry.fieldId)!)).map((entry) => entry.fieldId);
+      const targets = unresolvedIds(input, state.entries);
       if (!targets.length) return { source: null };
       const prompt = makePlannerPrompt(input, targets, state.entries);
       progress('Checking whether the complete application fits the on-device model…');
