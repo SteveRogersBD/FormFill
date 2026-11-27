@@ -17,7 +17,7 @@ let appCheckInstance: import('firebase/app-check').AppCheck | undefined;
 export async function getFirebaseServices() {
   if (!firebaseReady) throw new Error('Add your Firebase web app settings to .env.local to enable sign-in and cloud storage.');
   if (!services) {
-    const [{ initializeApp }, { getAuth }, { getFirestore }, { getStorage, setMaxUploadRetryTime }] = await Promise.all([
+    const [{ initializeApp }, { getAuth }, { getFirestore }, { getStorage }] = await Promise.all([
       import('firebase/app'), import('firebase/auth'), import('firebase/firestore'), import('firebase/storage'),
     ]);
     const app = initializeApp(firebaseConfig);
@@ -33,7 +33,7 @@ export async function getFirebaseServices() {
       appCheckInstance = initializeAppCheck(app, { provider, isTokenAutoRefreshEnabled: true });
     }
     const storage = getStorage(app);
-    setMaxUploadRetryTime(storage, 30_000);
+    storage.maxUploadRetryTime = 30_000;
     services = { auth: getAuth(app), db: getFirestore(app), storage };
   }
   return services;
