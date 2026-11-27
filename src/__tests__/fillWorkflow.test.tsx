@@ -60,30 +60,35 @@ afterEach(async () => {
   delete (globalThis as any).__applyAiPageListenerInstalled;
 });
 
+async function mountWorkflow(withAiQuestions = false) {
+  (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
+  const job = document.createElement('div'); const panel = document.createElement('div');
+  document.body.append(job, panel);
+  const jobRoot = createRoot(job); const panelRoot = createRoot(panel); roots.push(jobRoot, panelRoot);
+  let listener!: (message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean;
+  const messages: unknown[] = [];
+  const session = new Map<string, unknown>();
+  vi.stubGlobal('CSS', { escape: (value: string) => value });
+  vi.stubGlobal('chrome', {
+    runtime: { onMessage: { addListener: (value: typeof listener) => { listener = value; } } },
+    tabs: { query: async () => [{ id: 1, url: location.href }], sendMessage: async (_tab: number, message: unknown) => {
+      messages.push(message); panel.hidden = true;
+      const response = new Promise((resolve) => listener(message, {}, resolve));
+      if ((message as { type: string }).type === 'APPLYAI_FILL_FIELDS') modelWork.fill = response;
+      try { return await response; }
+      finally { panel.hidden = false; }
+    } },
+    scripting: { executeScript: async () => [{ frameId: 0 }] }, permissions: { contains: async () => true },
+    storage: { session: { get: async (key: string) => ({ [key]: session.get(key) }), set: async (data: Record<string, unknown>) => { for (const [key, value] of Object.entries(data)) session.set(key, value); }, remove: async (key: string) => { session.delete(key); } } },
+  });
+  await import('../content');
+  await act(async () => { jobRoot.render(<ControlledApplication withAiQuestions={withAiQuestions} />); panelRoot.render(<SidePanel user={{ uid: 'fixture-user' } as User} onLogout={async () => {}} />); });
+  return { job, panel, messages, session };
+}
+
 describe('complete contact autofill integration', () => {
   it('prepares saved facts through the real graph and fills real controlled inputs despite an unanswered required essay', async () => {
-    (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-    const job = document.createElement('div'); const panel = document.createElement('div');
-    document.body.append(job, panel);
-    const jobRoot = createRoot(job); const panelRoot = createRoot(panel); roots.push(jobRoot, panelRoot);
-    let listener!: (message: unknown, sender: unknown, respond: (value: unknown) => void) => boolean;
-    const messages: unknown[] = [];
-    const session = new Map<string, unknown>();
-    vi.stubGlobal('CSS', { escape: (value: string) => value });
-    vi.stubGlobal('chrome', {
-      runtime: { onMessage: { addListener: (value: typeof listener) => { listener = value; } } },
-      tabs: { query: async () => [{ id: 1, url: location.href }], sendMessage: async (_tab: number, message: unknown) => {
-        messages.push(message); panel.hidden = true;
-        const response = new Promise((resolve) => listener(message, {}, resolve));
-        if ((message as { type: string }).type === 'APPLYAI_FILL_FIELDS') modelWork.fill = response;
-        try { return await response; }
-        finally { panel.hidden = false; }
-      } },
-      scripting: { executeScript: async () => [{ frameId: 0 }] }, permissions: { contains: async () => true },
-      storage: { session: { get: async (key: string) => ({ [key]: session.get(key) }), set: async (data: Record<string, unknown>) => { for (const [key, value] of Object.entries(data)) session.set(key, value); }, remove: async (key: string) => { session.delete(key); } } },
-    });
-    await import('../content');
-    await act(async () => { jobRoot.render(<ControlledApplication />); panelRoot.render(<SidePanel user={{ uid: 'fixture-user' } as User} onLogout={async () => {}} />); });
+    const { job, panel, messages } = await mountWorkflow();
     const scan = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Scan and analyze with AI')!;
     await act(async () => scan.click());
     await act(async () => { await vi.waitFor(() => expect(modelWork.current, panel.textContent ?? '').toBeTruthy(), { timeout: 5000 }); await modelWork.current; });
