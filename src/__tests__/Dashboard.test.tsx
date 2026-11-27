@@ -8,19 +8,22 @@ import { Dashboard } from '../Dashboard';
 import { emptyPreferences, preferencesSchema } from '../preferences';
 import { emptyProfile, resumeProfileSchema, workExperienceSchema } from '../profile';
 
-const mocks = vi.hoisted(() => ({ save: vi.fn(), loadProfile: vi.fn(), loadPreferences: vi.fn(), saveProfile: vi.fn() }));
+const mocks = vi.hoisted(() => ({ save: vi.fn(), loadProfile: vi.fn(), loadPreferences: vi.fn(), saveProfile: vi.fn(), saveResume: vi.fn(), parse: vi.fn(), extract: vi.fn() }));
 vi.mock('../data', () => ({
   loadProfile: mocks.loadProfile, listApplications: async () => [],
   loadPreferences: mocks.loadPreferences,
-  savePreferences: mocks.save, saveProfile: mocks.saveProfile, saveResume: vi.fn(),
+  savePreferences: mocks.save, saveProfile: mocks.saveProfile, saveResume: mocks.saveResume,
   deleteApplication: vi.fn(), getResumeUrl: vi.fn(), updateApplication: vi.fn(),
 }));
+vi.mock('../resumeParser', () => ({ extractProfile: mocks.parse, extractResumeText: async () => 'Full fixture resume with three jobs and projects.' }));
+vi.mock('../ai', () => ({ extractResumeWithAI: mocks.extract }));
 
 beforeEach(() => {
   vi.clearAllMocks();
   mocks.loadProfile.mockResolvedValue(emptyProfile());
   mocks.loadPreferences.mockResolvedValue(preferencesSchema.parse({ requiresSponsorship: 'no', sponsorshipFuture: 'yes' }));
   mocks.saveProfile.mockImplementation(async (profile) => ({ ...profile, updatedAt: 1 }));
+  mocks.parse.mockResolvedValue({ ...emptyProfile(), fullName: 'Riley Example' });
 });
 
 async function renderDashboard() {
