@@ -24,7 +24,7 @@ vi.mock('../plannerModel', async () => {
 const roots: Root[] = [];
 
 beforeEach(() => {
-  vi.clearAllMocks(); modelWork.current = null; modelWork.fill = null; modelWork.appCheck = false;
+  vi.clearAllMocks(); vi.resetModules(); modelWork.current = null; modelWork.fill = null; modelWork.appCheck = false;
   modelWork.prepare.mockResolvedValue(false);
 });
 
@@ -106,7 +106,7 @@ describe('complete contact autofill integration', () => {
     const { job, panel, messages, session } = await mountWorkflow(true);
     await act(async () => panel.querySelector<HTMLInputElement>('.cloud-consent input')!.click());
     await act(async () => [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Scan and analyze with AI')!.click());
-    await act(async () => { await modelWork.current; });
+    await act(async () => { await vi.waitFor(() => expect(modelWork.current, panel.textContent ?? '').toBeTruthy()); await modelWork.current; });
     expect(modelWork.device).toHaveBeenCalledOnce(); expect(modelWork.cloud).toHaveBeenCalledOnce();
     const cloudData = JSON.parse(modelWork.cloud.mock.calls[0][0].split('DATA:\n')[1]);
     expect(cloudData.targetIds.map((id: string) => cloudData.fields.find((field: any) => field.id === id).label)).toEqual(['Why are you interested?', 'Mail routing code']);
