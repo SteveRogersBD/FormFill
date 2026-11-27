@@ -34,6 +34,22 @@ const profile = resumeProfileSchema.parse({
 });
 
 describe('cover letter drafting', () => {
+  it('extracts three separate jobs and projects in approved cloud AI using the complete resume', async () => {
+    vi.stubGlobal('LanguageModel', undefined);
+    aiMocks.getGenerativeModel.mockReturnValue(aiMocks.model);
+    const extracted = { fullName: 'Riley Example', workExperience: ['First Studio', 'Second Lab', 'Third Company'].map((company, index) => ({ id: `model-${index}`, company, jobTitle: 'Engineer', description: [`Built tools for ${company}.`] })), projects: ['Alpha\nBuilt a planner.', 'Beta\nBuilt a tutor.', 'Gamma\nBuilt a recipe tool.'] };
+    aiMocks.model.generateContent.mockResolvedValueOnce({ response: { text: () => JSON.stringify(extracted) } });
+    const text = 'COMPLETE RESUME '.repeat(1500) + 'FINAL SOURCE FACT';
+    const result = await extractResumeWithAI(text, true);
+    expect(result.source).toBe('IN_CLOUD');
+    expect(result.profile.workExperience.map((entry) => entry.company)).toEqual(['First Studio', 'Second Lab', 'Third Company']);
+    expect(result.profile.workExperience.map((entry) => entry.id)).toEqual(['work-1', 'work-2', 'work-3']);
+    expect(result.profile.projects).toEqual(extracted.projects);
+    expect(aiMocks.model.generateContent.mock.calls[0][0]).toContain(text);
+    expect(aiMocks.getGenerativeModel.mock.calls[0][1]).toMatchObject({ mode: 'ONLY_IN_CLOUD', inCloudParams: { generationConfig: { responseMimeType: 'application/json', responseJsonSchema: expect.any(Object) } } });
+    expect(aiMocks.model.initializeDeviceModel).not.toHaveBeenCalled();
+  });
+
   beforeEach(() => {
     vi.clearAllMocks();
     aiMocks.getGenerativeModel.mockReturnValue(aiMocks.model);
