@@ -35,6 +35,20 @@ async function renderDashboard() {
 }
 
 describe('dashboard profile editors', () => {
+  it('keeps project titles and multiple description lines together when editing and saving', async () => {
+    const projects = ['Alpha\nBuilt a planner.\nAdded an editor.', 'Beta\nBuilt a tutor.', 'Gamma\nBuilt a recipe tool.'];
+    mocks.loadProfile.mockResolvedValue(resumeProfileSchema.parse({ projects }));
+    const { host, root } = await renderDashboard();
+    try {
+      await act(async () => host.querySelector<HTMLButtonElement>('[aria-label="Edit Skills"]')!.click());
+      const textarea = [...host.querySelectorAll('textarea')].find((item) => item.placeholder.includes('One project per block'))!;
+      expect(textarea.value).toBe(projects.join('\n\n'));
+      await act(async () => { textarea.value = textarea.value.replace('Built a tutor.', 'Built a reviewed tutor.'); Simulate.change(textarea); });
+      await act(async () => Simulate.submit(host.querySelector('form')!));
+      expect(mocks.saveProfile.mock.calls[0][0].projects).toEqual([projects[0], 'Beta\nBuilt a reviewed tutor.', projects[2]]);
+    } finally { await act(async () => root.unmount()); host.remove(); }
+  });
+
   it('reviews separate AI jobs and projects and saves their fields after PDF upload fails', async () => {
     const parsed = { ...emptyProfile(), fullName: 'Riley Example', workExperience: ['First Studio', 'Second Lab', 'Third Company'].map((company, index) => workExperienceSchema.parse({ id: `role-${index}`, company, jobTitle: 'Engineer', description: [`Built tools at ${company}.`] })), projects: ['Alpha\nPlanning tool.', 'Beta\nTutor.', 'Gamma\nRecipe tool.'] };
     mocks.extract.mockResolvedValue({ profile: parsed, source: 'ON_DEVICE' });
