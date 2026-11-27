@@ -45,6 +45,27 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe('AI side panel workflow', () => {
+  it('preserves an uncertain submission request across reopening without automatically resending', async () => {
+    let filled = false;
+    mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => {
+      if (message.type === 'APPLYAI_FILL_FIELDS') { filled = true; return { filled: 2, failed: [] }; }
+      if (message.type === 'APPLYAI_SUBMIT_APPLICATION') throw new Error('The tab navigated before replying.');
+      return { ...application, fields: application.fields.map((field) => ({ ...field, currentValue: filled ? field.id === 'a' ? 'Remote' : 'No' : '' })) };
+    });
+    await act(async () => button('Scan and analyze with AI').click());
+    await act(async () => (host.querySelector('.confirm-sensitive input') as HTMLInputElement).click());
+    await act(async () => button('Fill reviewed answers').click());
+    await act(async () => button('Submit application').click());
+    expect(host.textContent).toContain('may have reached the job site');
+    expect(button('Submission requested').disabled).toBe(true);
+    await vi.waitFor(() => expect((mocks.session.get('applyAiWorkspace:user') as any)?.submissionRequested).toBe(true));
+    await act(async () => root.unmount()); root = createRoot(host);
+    await act(async () => root.render(<SidePanel user={{ uid: 'user' } as User} onLogout={async () => {}} />));
+    expect(button('Submission requested').disabled).toBe(true);
+    expect(mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_SUBMIT_APPLICATION')).toHaveLength(1);
+    expect(mocks.plan).toHaveBeenCalledOnce();
+  });
+
   it('rejects changed page answers before dispatching an explicit submission', async () => {
     let filled = false;
     let changed = false;
