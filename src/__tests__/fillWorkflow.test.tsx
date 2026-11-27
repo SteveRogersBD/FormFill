@@ -119,7 +119,7 @@ describe('complete contact autofill integration', () => {
     expect(modelWork.submit).not.toHaveBeenCalled();
     expect(submit.disabled, panel.textContent ?? '').toBe(false);
     expect(job.querySelector('textarea')!.value).toBe('My TypeScript skills align with the role.');
-    await act(async () => submit.click());
+    await act(async () => { submit.click(); await vi.waitFor(() => expect(modelWork.submit, panel.textContent ?? '').toHaveBeenCalledOnce()); });
     expect(modelWork.submit).toHaveBeenCalledOnce();
     expect(messages.filter((message: any) => message.type === 'APPLYAI_SUBMIT_APPLICATION')).toHaveLength(1);
     expect(panel.textContent).toContain('Submission requested');
