@@ -32,6 +32,33 @@ Recognized for inclusive product design.
 `;
 
 describe('extractProfileFromText', () => {
+  it('separates three company-first positions and three projects with wrapped descriptions', () => {
+    const profile = extractProfileFromText(`Riley Example
+WORK EXPERIENCE
+First Studio | Co-Founder and Full-Stack Developer   Remote | June 2025–Present
+Built a streaming platform supporting
+thousands of users.
+Second Lab | Forward Deployed Engineer   California | June 2026– Aug 2026
+Engineered retrieval tools.
+Third Company | Backend Engineer   Remote | Jan 2026–May 2026
+Built APIs.
+Projects
+Project Alpha | Code Oct 2026–Present
+Engineered a planning tool with
+interactive editing.
+Project Beta | Code | Demo Mar 2026
+Developed an educational assistant.
+Project Gamma | Code | Demo Jan 2026–Feb 2026
+Deployed a recipe service.`);
+    expect(profile.workExperience.map(({ company, jobTitle, location }) => [company, jobTitle, location])).toEqual([
+      ['First Studio', 'Co-Founder and Full-Stack Developer', 'Remote'], ['Second Lab', 'Forward Deployed Engineer', 'California'], ['Third Company', 'Backend Engineer', 'Remote'],
+    ]);
+    expect(profile.workExperience[1].description).toEqual(['Engineered retrieval tools.']);
+    expect(profile.projects).toHaveLength(3);
+    expect(profile.projects[0]).toBe('Project Alpha | Code Oct 2026–Present\nEngineered a planning tool with\ninteractive editing.');
+    expect(profile.projects[1]).not.toContain('Project Gamma');
+  });
+
   it('retains unstructured source evidence when extracting the full saved PDF text', async () => {
     pdfjs.GlobalWorkerOptions.workerSrc = new URL('../../node_modules/pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href;
     const bytes = await readFile(new URL('./fixtures/sample-resume.pdf', import.meta.url));
