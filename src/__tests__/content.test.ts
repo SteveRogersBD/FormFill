@@ -16,6 +16,20 @@ beforeEach(async () => {
 });
 
 describe('Ashby controls', () => {
+  it('submits only after an explicit request with a current valid snapshot', async () => {
+    document.body.innerHTML = '<form><label>Email<input type="email" required></label><button type="submit">Submit application</button></form>';
+    const submitted = vi.fn((event: Event) => event.preventDefault());
+    document.querySelector('form')!.addEventListener('submit', submitted);
+    const empty = await scan();
+    expect(await send({ type: 'APPLYAI_SUBMIT_APPLICATION', fields: empty.fields })).toMatchObject({ requested: false, error: expect.stringContaining('invalid') });
+    expect(await fill({ [empty.fields[0].id]: 'riley@example.test' })).toMatchObject({ filled: 1 });
+    expect(submitted).not.toHaveBeenCalled();
+    expect(await send({ type: 'APPLYAI_SUBMIT_APPLICATION', fields: empty.fields })).toMatchObject({ requested: false, error: expect.stringContaining('changed') });
+    const filled = await scan();
+    expect(await send({ type: 'APPLYAI_SUBMIT_APPLICATION', fields: filled.fields })).toEqual({ requested: true });
+    expect(submitted).toHaveBeenCalledOnce();
+  });
+
   it('reads external labels on custom radios with hidden backing inputs', async () => {
     document.body.innerHTML = '<div role="radiogroup" aria-label="Gender"><button type="button" role="radio" id="man" data-state="unchecked"></button><label for="man">Man</label><input type="hidden"><button type="button" role="radio" id="woman" data-state="unchecked"></button><label for="woman">Woman</label><input type="hidden"></div>';
     document.getElementById('man')!.addEventListener('mousedown', (event) => { (event.currentTarget as HTMLElement).setAttribute('data-state', 'checked'); });
