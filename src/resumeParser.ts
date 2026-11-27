@@ -63,6 +63,17 @@ function parseEducation(lines: string[]) {
   return { degree: parts[degreeIndex], major: parts.filter((_, index) => index !== degreeIndex).join(', ') };
 }
 
+function groupProjects(lines: string[]) {
+  const projects: string[] = [];
+  for (const line of lines) {
+    const heading = line.length <= 180 && !/[.,;:]$/.test(line) && !/^(built|created|developed|designed|engineered|implemented|integrated|deployed|led|using|with|and)\b/i.test(line)
+      && (/\s\|\s/.test(line) || (line.split(/\s+/).length <= 8 && line.split(/\s+/).every((word) => /^[A-Z0-9]/.test(word) || /^(of|and|for|the|a|in|with)$/i.test(word))));
+    if (heading || !projects.length) projects.push(line);
+    else projects[projects.length - 1] += `\n${line}`;
+  }
+  return projects;
+}
+
 export function extractProfileFromText(text: string): ResumeProfile {
   if (!text.trim()) throw new Error('This PDF has no selectable text. It may be scanned; OCR is not included yet. Your file is still selected, so you can enter details manually and save it.');
   const lines = cleanLines(text);
