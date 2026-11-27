@@ -118,6 +118,7 @@ export function extractProfileFromText(text: string): ResumeProfile {
   profile.university = educationLines.find((line) => /\b(university|college|institute|polytechnic)\b/i.test(line)) ?? profile.university;
   profile.graduationDate = educationLines.join('\n').match(/\b(?:Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|Jun(?:e)?|Jul(?:y)?|Aug(?:ust)?|Sep(?:tember)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?)[,\s]+20\d{2}\b|\b20\d{2}\b/g)?.at(-1) ?? '';
   profile.skills = [...new Set(profile.skills.flatMap((line) => line.split(/[,|•;]/).map((skill) => skill.trim()).filter(Boolean)))];
+  profile.projects = groupProjects(profile.projects);
 
   const location = parseResumeLocation(lines);
   profile.city = location.city;
