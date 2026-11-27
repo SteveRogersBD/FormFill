@@ -87,6 +87,47 @@ async function mountWorkflow(withAiQuestions = false) {
 }
 
 describe('complete contact autofill integration', () => {
+  it('scans once, resolves database then local then cloud, fills, and submits only on the separate click', async () => {
+    modelWork.appCheck = true; modelWork.prepare.mockResolvedValue(true);
+    modelWork.device.mockImplementation(async (prompt: string) => {
+      const data = JSON.parse(prompt.split('DATA:\n')[1]);
+      const localId = data.fields.find((field: any) => field.label === 'Networking profile').id;
+      return JSON.stringify({ answers: [{ fieldId: localId, kind: 'profile', keys: ['linkedin'], draft: '', reason: 'Saved networking link.' }] });
+    });
+    modelWork.cloud.mockImplementation(async (prompt: string) => {
+      const data = JSON.parse(prompt.split('DATA:\n')[1]);
+      return JSON.stringify({ answers: data.targetIds.map((fieldId: string) => {
+        const field = data.fields.find((item: any) => item.id === fieldId);
+        return field.label === 'Mail routing code'
+          ? { fieldId, kind: 'profile', keys: ['postalCode'], draft: '', reason: 'Saved postal code.' }
+          : { fieldId, kind: 'draft', keys: ['skills'], draft: 'My TypeScript skills align with the role.', reason: 'Reviewed career evidence.' };
+      }) });
+    });
+    const { job, panel, messages, session } = await mountWorkflow(true);
+    await act(async () => panel.querySelector<HTMLInputElement>('.cloud-consent input')!.click());
+    await act(async () => [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Scan and analyze with AI')!.click());
+    await act(async () => { await modelWork.current; });
+    expect(modelWork.device).toHaveBeenCalledOnce(); expect(modelWork.cloud).toHaveBeenCalledOnce();
+    const cloudData = JSON.parse(modelWork.cloud.mock.calls[0][0].split('DATA:\n')[1]);
+    expect(cloudData.targetIds.map((id: string) => cloudData.fields.find((field: any) => field.id === id).label)).toEqual(['Why are you interested?', 'Mail routing code']);
+    expect(panel.textContent).toContain('Attempted: on-device → cloud');
+    const submit = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Submit application')!;
+    expect(submit.disabled).toBe(true);
+    await act(async () => panel.querySelectorAll<HTMLInputElement>('.confirm-sensitive input').forEach((approval) => approval.click()));
+    await act(async () => [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Fill reviewed answers')!.click());
+    await act(async () => { await modelWork.fill; });
+    expect(modelWork.submit).not.toHaveBeenCalled();
+    expect(submit.disabled, panel.textContent ?? '').toBe(false);
+    expect(job.querySelector('textarea')!.value).toBe('My TypeScript skills align with the role.');
+    await act(async () => submit.click());
+    expect(modelWork.submit).toHaveBeenCalledOnce();
+    expect(messages.filter((message: any) => message.type === 'APPLYAI_SUBMIT_APPLICATION')).toHaveLength(1);
+    expect(panel.textContent).toContain('Submission requested');
+    expect(submit.disabled).toBe(true);
+    expect((session.get('applyAiWorkspace:fixture-user') as any).submissionRequested).toBe(true);
+    expect(modelWork.device).toHaveBeenCalledOnce(); expect(modelWork.cloud).toHaveBeenCalledOnce();
+  });
+
   it('prepares saved facts through the real graph and fills real controlled inputs despite an unanswered required essay', async () => {
     const { job, panel, messages } = await mountWorkflow();
     const scan = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Scan and analyze with AI')!;
@@ -103,5 +144,6 @@ describe('complete contact autofill integration', () => {
     expect(JSON.parse(job.querySelector('output[aria-label="Accepted choice values"]')!.textContent!)).toEqual({ gender: 'Man', veteran: 'none', arrangement: 'Hybrid' });
     expect(panel.textContent).toContain('Verified 10 fields');
     expect(messages.filter((message: any) => message.type === 'APPLYAI_FILL_FIELDS')).toHaveLength(1);
+    expect(modelWork.submit).not.toHaveBeenCalled();
   });
 });
