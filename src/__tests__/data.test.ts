@@ -1,11 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFile } from 'node:fs/promises';
 import { emptyPreferences, preferencesSchema } from '../preferences';
-import { loadPreferences, savePreferences } from '../data';
+import { loadPreferences, savePreferences, saveProfile, saveResume } from '../data';
+import { emptyProfile } from '../profile';
 
-const mocks = vi.hoisted(() => ({ setDoc: vi.fn(), getDoc: vi.fn(), doc: vi.fn() }));
-vi.mock('../firebase', () => ({ getFirebaseServices: async () => ({ db: {} }) }));
+const mocks = vi.hoisted(() => ({ setDoc: vi.fn(), getDoc: vi.fn(), doc: vi.fn(), upload: vi.fn(), remove: vi.fn() }));
+vi.mock('../firebase', () => ({ getFirebaseServices: async () => ({ db: {}, storage: {} }) }));
 vi.mock('firebase/firestore', () => ({ doc: mocks.doc, getDoc: mocks.getDoc, setDoc: mocks.setDoc }));
+vi.mock('firebase/storage', () => ({ ref: (_storage: unknown, path: string) => path, uploadBytes: mocks.upload, deleteObject: mocks.remove }));
 
 const documents = new Map<string, Record<string, unknown>>();
 beforeEach(() => {
@@ -16,6 +18,17 @@ beforeEach(() => {
 });
 
 describe('Equal Employment persistence', () => {
+  it('explains missing PDF buckets and can save the reviewed profile independently', async () => {
+    mocks.upload.mockRejectedValueOnce({ code: 'storage/unknown', serverResponse: '{"error":{"code":404}}' });
+    const profile = { ...emptyProfile(), fullName: 'Riley Example' };
+    await expect(saveResume(new File(['pdf'], 'resume.pdf', { type: 'application/pdf' }), profile, 'owner')).rejects.toThrow('Storage bucket is unavailable');
+    expect(mocks.setDoc).not.toHaveBeenCalled();
+    expect(mocks.remove).not.toHaveBeenCalled();
+    const saved = await saveProfile(profile, 'owner');
+    expect(saved).toMatchObject({ fullName: 'Riley Example', resumePath: '', updatedAt: expect.any(Number) });
+    expect(mocks.setDoc).toHaveBeenCalledWith('users/owner/profile/current', saved);
+  });
+
   it('requires Firestore rules to allow every serialized preference field', async () => {
     const rules = await readFile(new URL('../../firestore.rules', import.meta.url), 'utf8');
     const preferencesRule = rules.split('match /users/{userId}/preferences/{preferenceId}')[1].split('match /users/{userId}/applications')[0];
