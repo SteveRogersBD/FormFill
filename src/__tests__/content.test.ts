@@ -16,6 +16,20 @@ beforeEach(async () => {
 });
 
 describe('Ashby controls', () => {
+  it('rejects ambiguous submit buttons, non-final steps and multiple forms', async () => {
+    document.body.innerHTML = '<form><label>Name<input value="Riley"></label><button>Next</button></form>';
+    const clicked = vi.fn((event: Event) => event.preventDefault());
+    document.querySelector('button')!.addEventListener('click', clicked);
+    expect(await send({ type: 'APPLYAI_SUBMIT_APPLICATION', fields: (await scan()).fields })).toMatchObject({ requested: false, error: expect.stringContaining('final submit button') });
+    expect(clicked).not.toHaveBeenCalled();
+    document.querySelector('button')!.textContent = 'Submit';
+    document.querySelector('form')!.insertAdjacentHTML('beforeend', '<button>Submit application</button>');
+    expect(await send({ type: 'APPLYAI_SUBMIT_APPLICATION', fields: (await scan()).fields })).toMatchObject({ requested: false, error: expect.stringContaining('one final') });
+    document.body.insertAdjacentHTML('beforeend', '<form><label>Phone<input></label></form>');
+    expect(await send({ type: 'APPLYAI_SUBMIT_APPLICATION', fields: (await scan()).fields })).toMatchObject({ requested: false, error: expect.stringContaining('one application form') });
+    expect(clicked).not.toHaveBeenCalled();
+  });
+
   it('submits only after an explicit request with a current valid snapshot', async () => {
     document.body.innerHTML = '<form><label>Email<input type="email" required></label><button type="submit">Submit application</button></form>';
     const submitted = vi.fn((event: Event) => event.preventDefault());
