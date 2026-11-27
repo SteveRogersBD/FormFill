@@ -53,15 +53,16 @@ describe('application planning graph', () => {
     expect(device).toHaveBeenCalledOnce(); expect(cloud).not.toHaveBeenCalled();
   });
 
-  it('keeps manual edits fixed and reports omitted answers without a second request', async () => {
+  it('keeps manual edits fixed and passes omitted answers to approved cloud', async () => {
     const request = input([field('1', 'Preferred city'), field('2', 'Unfamiliar field')], true);
     request.fixedAnswers = { '1': 'My reviewed answer' };
     const device = vi.fn().mockResolvedValue(response(proposal('1', 'profile', ['state'])));
-    const cloud = vi.fn();
+    const cloud = vi.fn().mockResolvedValue(response(proposal('2', 'unknown', [])));
     const result = await runPlanner(request, { prepareDevice: async () => true, device, cloud });
     expect(result.entries[0]).toMatchObject({ value: 'My reviewed answer', source: 'user' });
-    expect(result.entries[1]).toMatchObject({ status: 'needs_user', reason: expect.stringContaining('did not return') });
-    expect(device).toHaveBeenCalledOnce(); expect(cloud).not.toHaveBeenCalled();
+    expect(result.entries[1]).toMatchObject({ status: 'needs_user', value: '' });
+    expect(device).toHaveBeenCalledOnce(); expect(cloud).toHaveBeenCalledOnce();
+    expect(JSON.parse(cloud.mock.calls[0][0].split('DATA:\n')[1]).targetIds).toEqual(['2']);
   });
 
   it('maps equivalent demographic option wording only from opted-in saved facts and holds it for review', () => {
@@ -127,13 +128,13 @@ describe('application planning graph', () => {
     expect(cloud).not.toHaveBeenCalled();
   });
 
-  it('never makes a second generation after invalid local JSON', async () => {
+  it('continues to approved cloud after invalid local JSON and preserves saved answers if both fail', async () => {
     const cloud = vi.fn().mockRejectedValue(new Error('offline'));
     const result = await runPlanner(input([field('1', 'Email'), field('2', 'Unknown')], true), { prepareDevice: async () => true, device: vi.fn().mockResolvedValue('not JSON'), cloud });
-    expect(cloud).not.toHaveBeenCalled();
+    expect(cloud).toHaveBeenCalledOnce();
     expect(result.entries[0].value).toBe('jordan@example.com');
-    expect(result.attempts).toEqual(['ON_DEVICE']);
-    expect(result.warnings).toHaveLength(1);
+    expect(result.attempts).toEqual(['ON_DEVICE', 'IN_CLOUD']);
+    expect(result.warnings).toHaveLength(2);
   });
 
   it('does not call cloud when the local plan resolves all answerable fields', async () => {
