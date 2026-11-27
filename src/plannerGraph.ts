@@ -74,6 +74,7 @@ export async function runPlanner(input: PlannerInput, models: PlannerModels, pro
       const targets = unresolvedIds(input, state.entries);
       if (!targets.length) return { source: null };
       if (input.allowCloud) return { source: 'IN_CLOUD' as const, prompt: makePlannerPrompt(input, targets, state.entries) };
+      if (state.warnings.length) return { source: null };
       return { source: null, warnings: [...state.warnings, 'Some questions remain unanswered after on-device AI. Allow cloud AI and analyze again, or enter the missing answers yourself.'] };
     })
     .addNode('cloud', infer('IN_CLOUD'))
