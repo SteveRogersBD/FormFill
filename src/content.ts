@@ -491,7 +491,7 @@ function submitApplication(expected: DetectedField[]) {
   const current = scanFields();
   if (!expected.length || current.length !== expected.length || current.some((field) => {
     const previous = expected.find((item) => item.id === field.id);
-    return !previous || previous.label !== field.label || previous.type !== field.type || previous.required !== field.required || previous.currentValue !== field.currentValue;
+    return !previous || Object.entries(field).some(([key, value]) => JSON.stringify(value) !== JSON.stringify(previous[key as keyof DetectedField]));
   })) throw new Error('The application changed. Scan, review and fill it again before submitting.');
   const forms = new Set(current.map((field) => {
     const control = document.querySelector<HTMLElement>(`[data-applyai-field="${CSS.escape(field.id)}"]`);
@@ -501,7 +501,7 @@ function submitApplication(expected: DetectedField[]) {
   if (!form) throw new Error('Could not identify one application form. Submit directly on the job site.');
   if (!form.reportValidity() || form.querySelector('[aria-invalid="true"]')) throw new Error('The job site reports missing or invalid answers. Review the application before submitting.');
   const buttons = [...document.querySelectorAll<HTMLButtonElement | HTMLInputElement>('button, input[type="submit"]')].filter((button) =>
-    button.form === form && visibleControl(button) && !button.disabled && button.getAttribute('aria-disabled') !== 'true'
+    button.form === form && button.type !== 'reset' && visibleControl(button) && !button.disabled && button.getAttribute('aria-disabled') !== 'true'
     && /^(submit(?: (?:your )?application)?|send application|apply(?: now)?)$/i.test(cleanLabelText(button instanceof HTMLInputElement ? button.value : controlLabel(button)))
   );
   if (buttons.length !== 1) throw new Error('Could not identify one final submit button. Submit directly on the job site.');
