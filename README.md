@@ -58,6 +58,12 @@ Equal Employment includes the reference's common questions: desired work countri
 
 Open ApplyAI from its toolbar icon while the job page is active. On the first scan for a site, ApplyAI shows an **Allow access to [site]** button in its side panel. Click it, approve Chrome's permission prompt, and ApplyAI scans the page. If the application is embedded from another ATS site, ApplyAI asks separately for that site too. Permissions remain until revoked in `chrome://extensions` → **ApplyAI** → **Details** → **Site access**. ApplyAI does not request access to every site.
 
+## Resume import and saving
+
+Local PDF import recognizes separate company-first job headings and groups project titles with their descriptions. After selecting a PDF, **Extract resume with AI** can extract the full profile into separate job records and project blocks through Firebase AI Logic. Local AI runs first when available. **Allow cloud resume extraction** explicitly permits sending the complete resume text to cloud AI if local extraction cannot complete. Review every extracted detail before saving. Project descriptions can span multiple lines; separate projects with a blank line in the editor.
+
+**Save imported resume** uploads the PDF to Storage and then saves the reviewed fields to Firestore. Missing buckets, denied uploads and upload retry limits now report actionable errors. **Save profile only** saves the fields to Firestore without uploading the selected PDF, allowing scans while Storage is unavailable. The selected PDF will not be attached to applications in that mode; select and save it again after Storage is configured. A $300 trial credit still needs an active billing account linked to the Firebase project before Storage can be provisioned.
+
 ## AI behavior
 
 The extension runs a LangGraph workflow: **scan all current questions → saved database facts → local AI → approved cloud AI for unresolved questions → review → fill and verify → explicit submission**. LangChain Core runnables wrap generation and structured JSON parsing. The graph runs inside the side panel; no Python server is required.
