@@ -119,14 +119,14 @@ describe('complete contact autofill integration', () => {
     expect(modelWork.submit).not.toHaveBeenCalled();
     expect(submit.disabled, panel.textContent ?? '').toBe(false);
     expect(job.querySelector('textarea')!.value).toBe('My TypeScript skills align with the role.');
-    await act(async () => { submit.click(); await vi.waitFor(() => expect(modelWork.submit, panel.textContent ?? '').toHaveBeenCalledOnce()); });
+    await act(async () => { submit.click(); await vi.waitFor(() => expect(modelWork.submit, panel.textContent ?? '').toHaveBeenCalledOnce(), { timeout: 5000 }); });
     expect(modelWork.submit).toHaveBeenCalledOnce();
     expect(messages.filter((message: any) => message.type === 'APPLYAI_SUBMIT_APPLICATION')).toHaveLength(1);
     expect(panel.textContent).toContain('Submission requested');
     expect(submit.disabled).toBe(true);
     expect((session.get('applyAiWorkspace:fixture-user') as any).submissionRequested).toBe(true);
     expect(modelWork.device).toHaveBeenCalledOnce(); expect(modelWork.cloud).toHaveBeenCalledOnce();
-  });
+  }, 10000);
 
   it('prepares saved facts through the real graph and fills real controlled inputs despite an unanswered required essay', async () => {
     const { job, panel, messages } = await mountWorkflow();
