@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({ initialize: vi.fn(), token: vi.fn(), custom: v
 vi.mock('firebase/app', () => ({ initializeApp: () => ({ name: 'test' }) }));
 vi.mock('firebase/auth', () => ({ getAuth: () => ({}) }));
 vi.mock('firebase/firestore', () => ({ getFirestore: () => ({}) }));
-vi.mock('firebase/storage', () => ({ getStorage: () => ({}) }));
+vi.mock('firebase/storage', () => ({ getStorage: () => ({}), setMaxUploadRetryTime: vi.fn() }));
 vi.mock('firebase/app-check', async (original) => {
   const sdk = await original<typeof import('firebase/app-check')>();
   return {
