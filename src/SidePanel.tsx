@@ -339,6 +339,37 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
     finally { setBusy(false); }
   };
 
+  const submitPage = async () => {
+    if (!scan || busy || submissionRequested) return;
+    const uid = user.uid;
+    const token = operation.current;
+    setBusy(true); setError('');
+    try {
+      if (!filled || stale || applicationReadiness(scan, plan, values, confirmed, manualDone, Boolean(profile.resumePath)).some((item) => item.blocking)) throw new Error('Fill and review all required answers before submitting.');
+      const tab = await getActiveApplicationTab();
+      if (tab.id !== scan.tabId || tab.url !== scan.url) throw new Error('Return to the scanned application tab before submitting.');
+      const current = await rescanApplicationFrames(tab.id, scan);
+      if (applicationFingerprint(scan) !== applicationFingerprint(current)) { setStale(true); throw new Error('The application questions changed. Scan, review and fill again before submitting.'); }
+      const prepared = prepareFill(scan, current, plan, values, confirmed);
+      if (prepared.skipped.length || prepared.targets.some(({ field, value }) => (field.currentValue ?? '') !== (field.type === 'checkbox' && value === 'false' ? '' : value))) throw new Error('Some prepared answers are unapproved or no longer match the page. Review and fill again before submitting.');
+      const frameIds = [...new Set(current.fields.map((field) => field.frameId ?? 0))];
+      if (frameIds.length !== 1) throw new Error('This application spans multiple frames. Submit directly on the job site.');
+      const workspace = await loadWorkspace(uid);
+      if (!workspace) throw new Error('Could not save the submission request. Scan and fill again before submitting.');
+      if (owner.current !== uid || token !== operation.current) return;
+      await saveWorkspace({ ...workspace, submissionRequested: true, updatedAt: Date.now() });
+      if (owner.current !== uid || token !== operation.current) return;
+      setSubmissionRequested(true);
+      let result: { requested: boolean; error?: string };
+      try {
+        result = await chrome.tabs.sendMessage(tab.id, { type: 'APPLYAI_SUBMIT_APPLICATION', fields: current.fields.map((field) => ({ ...field, id: field.frameFieldId ?? field.id })) }, { frameId: frameIds[0] });
+      } catch { throw new Error('The submission request may have reached the job site. Check the site for confirmation before trying again.'); }
+      if (result?.requested !== true) { setSubmissionRequested(false); throw new Error(result?.error || 'The job site could not submit this application.'); }
+      setNotice('Submission requested. Check the job site for confirmation, then mark the application submitted below.');
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not submit this application.'); }
+    finally { setBusy(false); }
+  };
+
   const reanalyze = async () => {
     if (!scan) return;
     const uid = user.uid;
