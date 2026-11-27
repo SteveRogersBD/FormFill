@@ -2,13 +2,15 @@ import { getAI, getGenerativeModel, GoogleAIBackend, InferenceMode } from 'fireb
 import { getApp } from 'firebase/app';
 import { z } from 'zod';
 import { isSensitiveField } from './fields';
-import type { ResumeProfile } from './profile';
+import { resumeProfileSchema, workExperienceSchema, type ResumeProfile } from './profile';
+import { firebaseAppCheckReady, getFirebaseServices, verifyAppCheck } from './firebase';
 
 const modelOutputSchema = z.object({
   answers: z.array(z.object({ fieldId: z.string().max(80), answer: z.string().max(800) }).strict()).max(40),
 }).strict();
 const coverLetterSchema = z.string().trim().min(1).max(5000);
 const jobDescriptionSchema = z.string().trim().min(1).max(12_000);
+const resumeExtractionSchema = resumeProfileSchema.omit({ resumePath: true, updatedAt: true, workExperience: true }).extend({ workExperience: z.array(workExperienceSchema).max(100) });
 
 export interface AIField { id: string; label: string; type: string; }
 
