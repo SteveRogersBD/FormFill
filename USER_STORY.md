@@ -33,14 +33,14 @@ As a job seeker, I want to activate ApplyAI while a supported job application is
 - It supports common text inputs, text areas, select menus, radio buttons, and checkboxes where the page permits interaction.
 - It shows proposed values for review and lets me edit them before or after filling.
 - Unsupported or ambiguous fields are flagged instead of guessed.
-- It never submits an application automatically.
+- Filling never submits automatically. After filling and review, I can choose a separate Submit application action on supported forms.
 
 ### US-03 — Match profile information to application fields
 
 As a job seeker, I want the extension to fill out the application using my saved information, so that I can avoid repetitive work.
 
-- Known facts are filled directly from my approved profile.
-- On-device AI matches unfamiliar field labels to relevant profile information.
+- The extension collects all questions on the current step, then answers known facts directly from my approved database profile.
+- Firebase AI Logic on-device AI handles unanswered questions next; approved Firebase cloud AI then handles only the questions still unresolved. Earlier answers remain preserved.
 - Open-ended questions use relevant resume details and approved answers to draft truthful responses.
 - When an application requests a cover letter, I can paste its job description and generate a draft grounded in my reviewed profile.
 - Cover-letter drafts stay in the extension for review and editing before I choose to place one in the application field.
@@ -72,7 +72,7 @@ As a job seeker, I want a cover-letter draft tailored to a job description, so t
 - The feature is offered when ApplyAI detects a cover-letter field on a supported application page.
 - I provide the job description; drafts use relevant details from my reviewed profile and do not invent qualifications or achievements.
 - On-device drafting is offered first when supported. Cloud drafting requires separate, explicit consent.
-- I can review and edit the draft before placing it in the form. ApplyAI never submits it for me.
+- I can review and edit the draft before placing it in the form. Submission requires my separate explicit action.
 
 ## MVP scope
 
@@ -91,5 +91,5 @@ As a job seeker, I want a cover-letter draft tailored to a job description, so t
 
 ## Definition of done
 
-A user can sign in, upload a PDF, review and edit extracted profile fields in the dashboard, open a supported application in Chrome, activate autofill, review and edit proposed answers, optionally draft and review a cover letter, fill the form, submit manually, and save a confirmed application record.
+A user can sign in, upload a PDF, review and edit extracted profile fields in the dashboard, open a supported application in Chrome, activate autofill, review and edit proposed answers, optionally draft and review a cover letter, fill the form, explicitly submit through ApplyAI or directly on the job site, check the site confirmation, and save a confirmed application record.
 
