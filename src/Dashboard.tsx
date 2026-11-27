@@ -25,6 +25,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
   const [draftPreferences, setDraftPreferences] = useState<Preferences>(emptyPreferences());
   const [editorError, setEditorError] = useState('');
   const [activeSection, setActiveSection] = useState('personal');
+  const [resumeCloudConsent, setResumeCloudConsent] = useState(false);
 
   const openEditor = (section: string) => {
     if (!loaded || working) return;
@@ -127,12 +128,25 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
     return () => observer.disconnect();
   }, [loaded]);
 
-  const save = async () => {
+  const save = async (includePdf = true) => {
     setWorking(true); setError(''); setMessage('');
     try {
-      const saved = file ? await saveResume(file, profile, user.uid) : await saveProfile(profile, user.uid);
-      setProfile(saved); setFile(null); setMessage('Your reviewed profile is saved to Firebase.');
+      const saved = file && includePdf ? await saveResume(file, profile, user.uid) : await saveProfile({ ...profile, resumePath: file ? '' : profile.resumePath }, user.uid);
+      setProfile(saved); setFile(null); setMessage(includePdf ? 'Your reviewed profile is saved to Firebase.' : 'Your reviewed profile is saved to Firestore. The PDF was not uploaded; resume attachment needs a saved PDF. You can refresh the side panel and scan now.');
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save your profile. Check your Firebase configuration and rules.'); }
+    finally { setWorking(false); }
+  };
+
+  const extractWithAI = async () => {
+    if (!file || working) return;
+    setWorking(true); setError(''); setMessage('Extracting separate jobs and projects with AI…');
+    try {
+      const [{ extractResumeText }, { extractResumeWithAI }] = await Promise.all([import('./resumeParser'), import('./ai')]);
+      const text = await extractResumeText(await file.arrayBuffer());
+      const result = await extractResumeWithAI(text, resumeCloudConsent);
+      setProfile({ ...result.profile, resumePath: profile.resumePath });
+      setMessage(`AI extracted ${result.profile.workExperience.length} work experience entries and ${result.profile.projects.length} projects ${result.source === 'ON_DEVICE' ? 'on your device' : 'in the approved cloud model'}. Review all details before saving.`);
+    } catch (reason) { setMessage(''); setError(reason instanceof Error ? reason.message : 'AI extraction failed. Your imported details are still available.'); }
     finally { setWorking(false); }
   };
 
