@@ -16,6 +16,11 @@ beforeEach(async () => {
 });
 
 describe('Ashby controls', () => {
+  it('identifies embedded Paycor forms without requesting unrelated frame origins', async () => {
+    document.body.innerHTML = '<iframe id="gnewtonIframe" title="open positions" src="https://recruitingbypaycor.com/career/SubmitResume.action?id=fixture"></iframe><iframe src="https://unrelated.example.test/widget"></iframe>';
+    expect((await scan()).applicationFrameOrigins).toEqual(['https://recruitingbypaycor.com']);
+  });
+
   it('rejects ambiguous submit buttons, non-final steps and multiple forms', async () => {
     document.body.innerHTML = '<form><label>Name<input value="Riley"></label><button>Next</button></form>';
     const clicked = vi.fn((event: Event) => event.preventDefault());
