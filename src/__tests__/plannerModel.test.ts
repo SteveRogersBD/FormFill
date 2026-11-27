@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { emptyProfile } from '../profile';
 import { emptyPreferences } from '../preferences';
 
-const mocks = vi.hoisted(() => ({ prompt: vi.fn(), measure: vi.fn(), destroy: vi.fn(), generate: vi.fn(), getModel: vi.fn(), token: vi.fn(), appCheck: true }));
+const mocks = vi.hoisted(() => ({ prompt: vi.fn(), measure: vi.fn(), destroy: vi.fn(), local: vi.fn(), initialize: vi.fn(), generate: vi.fn(), getModel: vi.fn(), token: vi.fn(), appCheck: true }));
 vi.mock('firebase/app', () => ({ getApp: () => ({}) }));
 vi.mock('../firebase', () => ({ get firebaseAppCheckReady() { return mocks.appCheck; }, getFirebaseServices: async () => ({}), verifyAppCheck: mocks.token }));
 vi.mock('firebase/ai', () => ({
@@ -17,7 +17,8 @@ const text = () => JSON.stringify({ answers: [{ fieldId: '1', kind: 'profile', k
 
 beforeEach(() => {
   vi.clearAllMocks(); mocks.appCheck = true;
-  mocks.getModel.mockReturnValue({ generateContent: mocks.generate });
+  mocks.getModel.mockImplementation((_ai, params) => ({ initializeDeviceModel: mocks.initialize, generateContent: params.mode === 'device' ? mocks.local : mocks.generate }));
+  mocks.initialize.mockResolvedValue(undefined); mocks.local.mockResolvedValue({ response: { text } });
   mocks.prompt.mockResolvedValue(text()); mocks.measure.mockResolvedValue(1000);
   mocks.generate.mockResolvedValue({ response: { text } });
   mocks.token.mockResolvedValue({ token: 'test-token' });
@@ -25,7 +26,7 @@ beforeEach(() => {
 });
 afterEach(() => vi.unstubAllGlobals());
 
-describe('single-call hybrid adapter', () => {
+describe('sequential Firebase hybrid adapter', () => {
   it('checks App Check and cloud generation using only a synthetic prompt', async () => {
     mocks.generate.mockResolvedValue({ response: { text: () => '{"status":"ready"}' } });
     expect(await checkAIConnection()).toContain('No Python server');
@@ -65,7 +66,10 @@ describe('single-call hybrid adapter', () => {
     const result = await planApplication(input());
     expect(result.entries[0].source).toBe('ON_DEVICE');
     expect(mocks.measure).toHaveBeenCalledWith(expect.stringContaining('Networking profile'), { responseConstraint: expect.any(Object) });
-    expect(mocks.prompt).toHaveBeenCalledOnce();
+    expect(mocks.prompt).not.toHaveBeenCalled();
+    expect(mocks.local).toHaveBeenCalledOnce(); expect(mocks.initialize).toHaveBeenCalledOnce();
+    expect(mocks.getModel.mock.calls[0][1]).toMatchObject({ mode: 'device', onDeviceParams: { promptOptions: { responseConstraint: expect.any(Object) } } });
+    expect(mocks.getModel.mock.calls[0][1].onDeviceParams.createOptions.signal.aborted).toBe(true);
     expect(mocks.generate).not.toHaveBeenCalled();
     expect(mocks.destroy).toHaveBeenCalledOnce();
   });
@@ -89,12 +93,13 @@ describe('single-call hybrid adapter', () => {
     expect(mocks.prompt).not.toHaveBeenCalled();
   });
 
-  it('does not silently fall back after a generation failure', async () => {
-    mocks.prompt.mockRejectedValue(new Error('generation failed'));
+  it('continues to approved cloud after Firebase local generation fails', async () => {
+    mocks.local.mockRejectedValue(new Error('generation failed'));
     const result = await planApplication(input());
-    expect(result.attempts).toEqual(['ON_DEVICE']);
-    expect(mocks.generate).not.toHaveBeenCalled();
-    expect(result.warnings[0]).toContain('No second generation');
+    expect(result.attempts).toEqual(['ON_DEVICE', 'IN_CLOUD']);
+    expect(mocks.generate).toHaveBeenCalledOnce();
+    expect(result.entries[0].source).toBe('IN_CLOUD');
+    expect(result.warnings[0]).toContain('Approved cloud AI');
   });
 
   it('prevents cloud generation without App Check or consent', async () => {
