@@ -67,7 +67,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
 
   const updateField = (key: ProfileField, rawValue: string) => {
     const field = PROFILE_FIELDS.find((item) => item.key === key);
-    const value = field?.list ? rawValue.split(field.key === 'skills' ? /\n|,/ : /\n/).map((item) => item.trim()).filter(Boolean) : rawValue;
+    const value = field?.list ? rawValue.split(field.key === 'skills' ? /\n|,/ : field.key === 'projects' ? /\n\s*\n/ : /\n/).map((item) => item.trim()).filter(Boolean) : rawValue;
     setDraftProfile((current) => ({ ...current, [key]: value }));
   };
 
@@ -224,7 +224,7 @@ export function Dashboard({ user, onLogout }: { user: User; onLogout: () => Prom
           <section className="card resume-card" id="resume"><div className="section-heading"><h2>Your resume</h2><span className="icon-badge" aria-hidden="true">↥</span></div>
             <label className="upload-zone"><input type="file" accept="application/pdf,.pdf" disabled={!loaded || working} onChange={chooseResume} /><span className="upload-icon" aria-hidden="true">↑</span><strong>{working ? 'Working…' : file ? file.name : 'Upload a PDF resume'}</strong><span className="muted small-text">Click to browse · up to 10 MB</span></label>
             {profile.resumePath && !file && <button className="text-button" onClick={openResume}>Open current resume ↗</button>}
-            {file && <><p className="field-note">Review the imported details before saving.</p><button className="button primary wide" onClick={save} disabled={working || !loaded}>Save imported resume</button></>}
+            {file && <><p className="field-note">Review the imported details before saving. AI extraction separates jobs and projects into individual entries.</p><label className="cloud-consent"><input type="checkbox" checked={resumeCloudConsent} disabled={working} onChange={(event) => setResumeCloudConsent(event.target.checked)} /> Allow cloud resume extraction. This sends the complete resume text, including contact details, to Firebase AI Logic if local AI is unavailable or fails.</label><button className="button secondary wide" onClick={extractWithAI} disabled={working || !loaded}>{working ? 'Working…' : 'Extract resume with AI'}</button><button className="button primary wide" onClick={() => { void save(); }} disabled={working || !loaded}>{working ? 'Working…' : 'Save imported resume'}</button><button className="button secondary wide" onClick={() => { void save(false); }} disabled={working || !loaded}>Save profile only</button><p className="field-note">Profile-only saving uses Firestore and skips the PDF upload. You can scan using saved fields; attaching the PDF requires Storage.</p>{error && <p className="field-note">{error}</p>}{message && <p className="field-note">{message}</p>}</>}
             <p className="privacy-note">Text extraction happens in your browser. Your PDF is uploaded only when you save.</p>
           </section>
           <section className="card profile-shortcuts"><button onClick={() => document.getElementById('resume')?.scrollIntoView({ block: 'center' })}>Manage my resume <span aria-hidden="true">›</span></button><button disabled={!loaded || working} onClick={() => openEditor('personal')}>Update LinkedIn & portfolio <span aria-hidden="true">›</span></button><p>Your saved details are the source for future autofill answers.</p></section>
