@@ -28,10 +28,12 @@ export function normalizeWorkExperience(value: unknown): unknown {
   for (const [index, raw] of value.entries()) {
     const line = raw.trim();
     if (!line) continue;
-    const role = line.length <= 160 && !line.endsWith('.') && line.split(/\s+/).length <= 12
+    const pipeRole = line.match(/^([^|]+?)\s*\|\s*(.+?)\s*\|\s*((?:[A-Za-z]{3,9}\.?\s+)?\d{4}\s*[-–—].+)$/);
+    const role = pipeRole ? [line, pipeRole[2], pipeRole[1]] : line.length <= 160 && !line.endsWith('.') && line.split(/\s+/).length <= 12
       && !/^(led|built|worked|created|managed|designed|developed|drove|owned|shipped|delivered|launched|partnered|collaborated)\b/i.test(line)
       ? line.match(/^(.+?)\s+at\s+(.+?)(?:\s*[·|]\s*.*)?$/i) : null;
-    if (role || !entries.length) entries.push(workExperienceSchema.parse({ id: `imported-${index}`, jobTitle: role?.[1] ?? '', company: role?.[2] ?? '', summary: role ? line.split(/[·|]/).slice(1).map((part) => part.trim()).join(' · ') : '' }));
+    const columns = pipeRole?.[2].split(/\s{2,}/);
+    if (role || !entries.length) entries.push(workExperienceSchema.parse({ id: `imported-${index}`, jobTitle: columns?.[0] ?? role?.[1] ?? '', company: role?.[2] ?? '', location: columns?.slice(1).join(' ') ?? '', summary: pipeRole ? pipeRole[3] : role ? line.split(/[·|]/).slice(1).map((part) => part.trim()).join(' · ') : '' }));
     if (!role) entries[entries.length - 1].description.push(line);
   }
   return entries;
