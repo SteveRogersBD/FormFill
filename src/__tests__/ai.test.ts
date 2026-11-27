@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { draftCoverLetterInCloud, draftCoverLetterOnDevice } from '../ai';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { draftCoverLetterInCloud, draftCoverLetterOnDevice, extractResumeWithAI } from '../ai';
 import { emptyProfile, resumeProfileSchema } from '../profile';
 
 const aiMocks = vi.hoisted(() => ({
@@ -19,6 +19,9 @@ vi.mock('firebase/ai', () => ({
   InferenceMode: { ONLY_ON_DEVICE: 'ONLY_ON_DEVICE', ONLY_IN_CLOUD: 'ONLY_IN_CLOUD' },
 }));
 vi.mock('firebase/app', () => ({ getApp: aiMocks.getApp }));
+vi.mock('../firebase', () => ({ firebaseAppCheckReady: true, getFirebaseServices: async () => ({}), verifyAppCheck: async () => {} }));
+
+afterEach(() => vi.unstubAllGlobals());
 
 const profile = resumeProfileSchema.parse({
   ...emptyProfile(),
