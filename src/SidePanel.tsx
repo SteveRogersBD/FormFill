@@ -255,12 +255,13 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
       }
       if (token !== operation.current || owner.current !== uid) return;
       // Keep edits only for stable questions on the same application tab.
-      if (scan?.url !== result.url || scan?.tabId !== result.tabId) { editedFields.current.clear(); setSubmissionRequested(false); }
+      const sameApplication = scan?.url === result.url && scan?.tabId === result.tabId;
+      if (!sameApplication) { editedFields.current.clear(); setSubmissionRequested(false); }
       setScan(result); setResumeText(fullResumeText); resumeSource.current = currentProfile.resumePath; setPlan(null); setManualDone({});
       setCompany(result.company || (result.platform === 'greenhouse' ? '' : new URL(result.url).hostname.replace(/^www\./, '').split('.')[0] ?? ''));
       setRole(result.role || result.title);
       setValues((current) => Object.fromEntries(result.fields.map((field) => [field.id, editedFields.current.has(field.id) ? current[field.id] ?? '' : field.currentValue || savedAnswer(field.label, currentProfile, currentPreferences)])));
-      await saveWorkspace({ version: 1, uid, tabId: tab.id, scan: result, plan: null, values: Object.fromEntries(result.fields.map((field) => [field.id, editedFields.current.has(field.id) ? values[field.id] ?? '' : field.currentValue || savedAnswer(field.label, currentProfile, currentPreferences)])), confirmed: {}, manualDone: {}, edited: [...editedFields.current], company: result.company, role: result.role, resumeText: fullResumeText, resumePath: currentProfile.resumePath, outcomes: {}, updatedAt: Date.now() }).catch(() => setError('Could not save the temporary workspace. Keep this panel open.'));
+      await saveWorkspace({ version: 1, uid, tabId: tab.id, scan: result, plan: null, values: Object.fromEntries(result.fields.map((field) => [field.id, editedFields.current.has(field.id) ? values[field.id] ?? '' : field.currentValue || savedAnswer(field.label, currentProfile, currentPreferences)])), confirmed: {}, manualDone: {}, edited: [...editedFields.current], company: result.company, role: result.role, resumeText: fullResumeText, resumePath: currentProfile.resumePath, outcomes: {}, submissionRequested: sameApplication && submissionRequested, updatedAt: Date.now() }).catch(() => setError('Could not save the temporary workspace. Keep this panel open.'));
       if (token !== operation.current || owner.current !== uid) return;
       const pageType = result.platform === 'greenhouse' ? ' on this Greenhouse application' : '';
       setNotice(result.fields.length ? `Found ${result.fields.length} fields${pageType}. Review the suggestions before filling.` : 'No supported form fields were found on this page.');
