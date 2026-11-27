@@ -28,7 +28,7 @@ export function normalizeWorkExperience(value: unknown): unknown {
   for (const [index, raw] of value.entries()) {
     const line = raw.trim();
     if (!line) continue;
-    const pipeRole = line.match(/^([^|]+?)\s*\|\s*(.+?)\s*\|\s*((?:[A-Za-z]{3,9}\.?\s+)?\d{4}\s*[-–—].+)$/);
+    const pipeRole = !/\sat\s/i.test(line.split('|')[0]) ? line.match(/^([^|]+?)\s*\|\s*(.+?)\s*\|\s*((?:[A-Za-z]{3,9}\.?\s+)?\d{4}\s*[-–—].+)$/) : null;
     const role = pipeRole ? [line, pipeRole[2], pipeRole[1]] : line.length <= 160 && !line.endsWith('.') && line.split(/\s+/).length <= 12
       && !/^(led|built|worked|created|managed|designed|developed|drove|owned|shipped|delivered|launched|partnered|collaborated)\b/i.test(line)
       ? line.match(/^(.+?)\s+at\s+(.+?)(?:\s*[·|]\s*.*)?$/i) : null;
