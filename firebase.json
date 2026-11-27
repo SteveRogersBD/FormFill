@@ -1,4 +1,12 @@
 {
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "ApplyAI",
+        "supportEmail": "lalamiya3333@gmail.com"
+      }
+    }
+  },
   "firestore": { "rules": "firestore.rules" },
   "storage": { "rules": "storage.rules" },
   "hosting": {
