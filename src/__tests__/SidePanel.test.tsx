@@ -45,6 +45,18 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe('AI side panel workflow', () => {
+  it('keeps scanned questions available when the profile database cannot be reached', async () => {
+    mocks.profile.mockRejectedValue(new Error('Profile database unavailable.'));
+    mocks.plan.mockResolvedValue({ entries: [], attempts: [], warnings: [] });
+    await act(async () => root.unmount()); root = createRoot(host);
+    await act(async () => root.render(<SidePanel user={{ uid: 'user' } as User} onLogout={async () => {}} />));
+    expect(button('Scan and analyze with AI').disabled).toBe(false);
+    await act(async () => button('Scan and analyze with AI').click());
+    expect(host.textContent).toContain('You can still scan and enter answers manually');
+    expect(host.querySelectorAll('.answer-row')).toHaveLength(2);
+    expect(mocks.plan.mock.calls[0][0].profile).toEqual(emptyProfile());
+  });
+
   it('scans all application questions without a resume or a saved profile', async () => {
     mocks.profile.mockResolvedValue(null);
     mocks.preferences.mockResolvedValue(emptyPreferences());
