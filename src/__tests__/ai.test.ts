@@ -11,7 +11,8 @@ const aiMocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock('firebase/ai', () => ({
+vi.mock('firebase/ai', async (original) => ({
+  Schema: (await original<typeof import('firebase/ai')>()).Schema,
   getGenerativeModel: aiMocks.getGenerativeModel,
   InferenceMode: { ONLY_ON_DEVICE: 'ONLY_ON_DEVICE', ONLY_IN_CLOUD: 'ONLY_IN_CLOUD' },
 }));
@@ -64,7 +65,11 @@ describe('cover letter drafting', () => {
     expect(result.profile.workExperience.map((entry) => entry.id)).toEqual(['work-1', 'work-2', 'work-3']);
     expect(result.profile.projects).toEqual(extracted.projects);
     expect(aiMocks.model.generateContent.mock.calls[0][0]).toContain(text);
-    expect(aiMocks.getGenerativeModel.mock.calls[0][1]).toMatchObject({ mode: 'ONLY_IN_CLOUD', inCloudParams: { generationConfig: { responseMimeType: 'application/json', responseJsonSchema: expect.any(Object) } } });
+    expect(aiMocks.getGenerativeModel.mock.calls[0][1]).toMatchObject({ mode: 'ONLY_IN_CLOUD', inCloudParams: { generationConfig: { responseMimeType: 'application/json', responseSchema: expect.any(Object) } } });
+    const outputSchema = aiMocks.getGenerativeModel.mock.calls[0][1].inCloudParams.generationConfig.responseSchema;
+    expect(outputSchema.properties.workExperience.items.properties).toHaveProperty('company');
+    expect(outputSchema.properties.projects.items.type).toBe('string');
+    expect(JSON.stringify(outputSchema)).not.toContain('"default"');
     expect(aiMocks.model.initializeDeviceModel).not.toHaveBeenCalled();
   });
 
