@@ -1,7 +1,6 @@
-import { getAI, getGenerativeModel, GoogleAIBackend, InferenceMode, Schema } from 'firebase/ai';
+import { getGenerativeModel, InferenceMode, Schema } from 'firebase/ai';
 import { z } from 'zod';
-import { getApp } from 'firebase/app';
-import { firebaseAppCheckReady, getFirebaseServices, verifyAppCheck } from './firebase';
+import { firebaseAppCheckReady, getFirebaseAI, getFirebaseServices, verifyAppCheck } from './firebase';
 import { runPlanner } from './plannerGraph';
 import { proposalSchema, type PlannerInput } from './planner';
 
@@ -46,7 +45,7 @@ export async function checkAIConnection(): Promise<string> {
   try { await deadline(verifyAppCheck(true), 15_000); }
   catch (reason) { throw aiSetupError(reason, 'appcheck'); }
   try {
-    const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), {
+    const model = getGenerativeModel(await getFirebaseAI(), {
       mode: InferenceMode.ONLY_IN_CLOUD,
       inCloudParams: { model: import.meta.env.VITE_FIREBASE_AI_MODEL || 'gemini-3.5-flash-lite', generationConfig: { responseMimeType: 'application/json', responseSchema: Schema.object({ properties: { status: Schema.string() } }), maxOutputTokens: 64 } },
     });
@@ -95,7 +94,7 @@ export async function planApplication(input: PlannerInput, progress?: (message: 
       const controller = new AbortController();
       try {
         await getFirebaseServices();
-        const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), {
+        const model = getGenerativeModel(await getFirebaseAI(), {
           mode: InferenceMode.ONLY_ON_DEVICE,
           onDeviceParams: { createOptions: { ...options, signal: controller.signal }, promptOptions: { responseConstraint: constraint } },
         });
@@ -109,7 +108,7 @@ export async function planApplication(input: PlannerInput, progress?: (message: 
       if (!input.allowCloud || !firebaseAppCheckReady) throw new Error('Cloud inference needs consent and Firebase App Check.');
       try {
       await getFirebaseServices();
-      const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), {
+      const model = getGenerativeModel(await getFirebaseAI(), {
         mode: InferenceMode.ONLY_IN_CLOUD,
         inCloudParams: { model: import.meta.env.VITE_FIREBASE_AI_MODEL || 'gemini-3.5-flash-lite', generationConfig: { responseMimeType: 'application/json', responseSchema, maxOutputTokens: 32768 } },
       });
