@@ -49,7 +49,8 @@ describe('AI side panel workflow', () => {
     mocks.profile.mockResolvedValue(null);
     mocks.preferences.mockResolvedValue(emptyPreferences());
     mocks.plan.mockResolvedValue({ entries: [], attempts: [], warnings: [] });
-    await act(async () => button('refresh the profile here').click());
+    await act(async () => root.unmount()); root = createRoot(host);
+    await act(async () => root.render(<SidePanel user={{ uid: 'user' } as User} onLogout={async () => {}} />));
     expect(host.textContent).toContain('scan questions without a resume');
     expect(button('Scan and analyze with AI').disabled).toBe(false);
     await act(async () => button('Scan and analyze with AI').click());
@@ -57,7 +58,7 @@ describe('AI side panel workflow', () => {
     expect(mocks.plan.mock.calls[0][0]).toMatchObject({ profile: emptyProfile(), resumeText: '', allowCloud: false });
     expect(mocks.plan.mock.calls[0][0].fields).toHaveLength(2);
     expect(host.querySelectorAll('.answer-row')).toHaveLength(2);
-    expect(host.querySelectorAll<HTMLInputElement>('.answer-row input')[0]?.value ?? '').toBe('');
+    expect([...host.querySelectorAll<HTMLSelectElement>('.answer-row select')].map((select) => select.value)).toEqual(['', '']);
   });
 
   it('preserves an uncertain submission request across reopening without automatically resending', async () => {
