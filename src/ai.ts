@@ -13,9 +13,10 @@ const resumeExtractionSchema = resumeProfileSchema.omit({ resumePath: true, upda
 
 export interface AIField { id: string; label: string; type: string; }
 
-function cloudResumeSchema(schema: ReturnType<typeof z.toJSONSchema>): TypedSchema {
+function cloudResumeSchema(schema: z.core.JSONSchema._JSONSchema): TypedSchema {
+  if (typeof schema === 'boolean') throw new Error('Unsupported resume extraction field schema.');
   if (schema.type === 'object') return Schema.object({ properties: Object.fromEntries(Object.entries(schema.properties ?? {}).map(([key, value]) => [key, cloudResumeSchema(value)])) });
-  if (schema.type === 'array') return Schema.array({ items: cloudResumeSchema(schema.items as ReturnType<typeof z.toJSONSchema>) });
+  if (schema.type === 'array' && schema.items !== undefined && !Array.isArray(schema.items)) return Schema.array({ items: cloudResumeSchema(schema.items) });
   if (schema.type === 'boolean') return Schema.boolean();
   if (schema.type === 'string') {
     const values = schema.enum?.filter((value): value is string => typeof value === 'string');
