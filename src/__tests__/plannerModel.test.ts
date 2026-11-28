@@ -60,6 +60,7 @@ describe('sequential Firebase hybrid adapter', () => {
     expect(error.message).not.toContain('secret-key-placeholder');
     expect(aiSetupError(new Error('API has not been used or is disabled')).message).toContain('AI Logic');
     expect(aiSetupError(new Error('App Check attestation failed')).message).toContain('Manage debug tokens');
+    expect(aiSetupError(new Error('429 Your prepayment credits are depleted.')).message).toContain('prepayment balance');
   });
   it('measures complete context and uses constrained on-device output once', async () => {
     const result = await planApplication(input());
