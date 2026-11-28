@@ -20,6 +20,8 @@ function cloudResumeSchema(schema: z.core.JSONSchema._JSONSchema): TypedSchema {
   if (schema.type === 'boolean') return Schema.boolean();
   if (schema.type === 'string') {
     const values = schema.enum?.filter((value): value is string => typeof value === 'string');
+    // Firebase typed enums reject empty values; Zod still checks the allowed job types.
+    if (values?.includes('')) return Schema.string({ description: `Leave empty when missing; otherwise use one of: ${values.filter(Boolean).join(', ')}.` });
     return values?.length ? Schema.enumString({ enum: values }) : Schema.string();
   }
   throw new Error('Unsupported resume extraction field type.');
