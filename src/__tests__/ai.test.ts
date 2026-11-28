@@ -68,6 +68,8 @@ describe('cover letter drafting', () => {
     expect(aiMocks.getGenerativeModel.mock.calls[0][1]).toMatchObject({ mode: 'ONLY_IN_CLOUD', inCloudParams: { generationConfig: { responseMimeType: 'application/json', responseSchema: expect.any(Object) } } });
     const outputSchema = aiMocks.getGenerativeModel.mock.calls[0][1].inCloudParams.generationConfig.responseSchema;
     expect(outputSchema.properties.workExperience.items.properties).toHaveProperty('company');
+    expect(outputSchema.properties.workExperience.items.properties.jobType.enum).toBeUndefined();
+    expect(outputSchema.properties.workExperience.items.properties.jobType.description).toContain('Leave empty');
     expect(outputSchema.properties.projects.items.type).toBe('string');
     expect(JSON.stringify(outputSchema)).not.toContain('"default"');
     expect(aiMocks.model.initializeDeviceModel).not.toHaveBeenCalled();
