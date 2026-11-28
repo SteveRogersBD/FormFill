@@ -5,7 +5,6 @@ import { emptyProfile, resumeProfileSchema } from '../profile';
 const aiMocks = vi.hoisted(() => ({
   getAI: vi.fn(() => ({})),
   getGenerativeModel: vi.fn(),
-  getApp: vi.fn(() => ({})),
   model: {
     initializeDeviceModel: vi.fn(),
     generateContent: vi.fn(),
@@ -13,13 +12,10 @@ const aiMocks = vi.hoisted(() => ({
 }));
 
 vi.mock('firebase/ai', () => ({
-  getAI: aiMocks.getAI,
   getGenerativeModel: aiMocks.getGenerativeModel,
-  GoogleAIBackend: class {},
   InferenceMode: { ONLY_ON_DEVICE: 'ONLY_ON_DEVICE', ONLY_IN_CLOUD: 'ONLY_IN_CLOUD' },
 }));
-vi.mock('firebase/app', () => ({ getApp: aiMocks.getApp }));
-vi.mock('../firebase', () => ({ firebaseAppCheckReady: true, getFirebaseServices: async () => ({}), verifyAppCheck: async () => {} }));
+vi.mock('../firebase', () => ({ firebaseAppCheckReady: true, getFirebaseAI: async () => aiMocks.getAI(), getFirebaseServices: async () => ({}), verifyAppCheck: async () => {} }));
 
 afterEach(() => vi.unstubAllGlobals());
 
