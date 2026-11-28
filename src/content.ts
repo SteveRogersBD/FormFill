@@ -177,6 +177,14 @@ function selectedChoice(element: HTMLElement) {
     || /(?:^|[\s_-])(selected|checked|active)(?:[\s_-]|$)/i.test(element.className);
 }
 
+function closeListbox(element: HTMLElement) {
+  element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', bubbles: true }));
+  if (element.getAttribute('aria-expanded') === 'true') {
+    element.blur();
+    if (element.getAttribute('aria-expanded') === 'true') activateControl(element);
+  }
+}
+
 function controlLabel(element: HTMLElement) {
   const ids = element.getAttribute('aria-labelledby')?.split(/\s+/) ?? [];
   const labelled = ids.map((id) => document.getElementById(id)?.textContent ?? '').join(' ');
@@ -370,10 +378,15 @@ async function pickListOption(element: HTMLElement, value: string) {
       const selected = option.getAttribute('aria-selected') === 'true';
       const displayed = element instanceof HTMLInputElement ? element.value : cleanLabelText(element.textContent);
       const closed = element.getAttribute('aria-expanded') === 'false' || !option.isConnected;
-      return selected || (closed && (wanted.has(normalizeOption(displayed)) || normalizeOption(displayed) === normalizeOption(offered)));
+      const accepted = selected || (closed && (wanted.has(normalizeOption(displayed)) || normalizeOption(displayed) === normalizeOption(offered)));
+      if (!accepted) closeListbox(element);
+      return accepted;
     }
     await new Promise((resolve) => setTimeout(resolve, 100));
   }
+  // A stale or unsupported proposal must not strand the application page in an
+  // open menu. Otherwise the next field can open another menu on top of it.
+  closeListbox(element);
   return false;
 }
 

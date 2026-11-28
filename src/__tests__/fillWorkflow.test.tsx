@@ -113,8 +113,7 @@ describe('complete contact autofill integration', () => {
     expect(panel.textContent).toContain('Attempted: on-device → cloud');
     const submit = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Submit application')!;
     expect(submit.disabled).toBe(true);
-    await act(async () => panel.querySelectorAll<HTMLInputElement>('.confirm-sensitive input').forEach((approval) => approval.click()));
-    await act(async () => [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Fill reviewed answers')!.click());
+    await act(async () => [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Fill prepared answers')!.click());
     await act(async () => { await modelWork.fill; });
     expect(modelWork.submit).not.toHaveBeenCalled();
     expect(submit.disabled, panel.textContent ?? '').toBe(false);
@@ -134,8 +133,7 @@ describe('complete contact autofill integration', () => {
     const scan = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Scan and analyze with AI')!;
     await act(async () => scan.click());
     await act(async () => { await vi.waitFor(() => expect(modelWork.current, panel.textContent ?? '').toBeTruthy(), { timeout: 5000 }); await modelWork.current; });
-    await act(async () => { panel.querySelectorAll<HTMLInputElement>('.confirm-sensitive input').forEach((approval) => approval.click()); });
-    const partial = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Fill prepared answers')!;
+    const partial = [...panel.querySelectorAll('button')].find((button) => button.textContent === 'Fill prepared answers' && !button.disabled)!;
     expect(partial).toBeTruthy(); expect(partial.disabled, panel.textContent ?? '').toBe(false);
     await act(async () => partial.click());
     await act(async () => { await vi.waitFor(() => expect(modelWork.fill).toBeTruthy(), { timeout: 5000 }); expect(await modelWork.fill).toMatchObject({ filled: 10, failed: [] }); });

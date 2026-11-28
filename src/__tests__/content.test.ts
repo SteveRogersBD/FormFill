@@ -106,6 +106,21 @@ describe('Ashby controls', () => {
     expect(combo.textContent).toBe('Man'); expect(submit).not.toHaveBeenCalled();
   });
 
+  it('closes custom dropdowns when an answer cannot match an offered option', async () => {
+    document.body.innerHTML = `<div class="ashby-application-form-field-entry"><label class="ashby-application-form-question-title">Degree</label><button type="button" role="combobox" aria-controls="degree-options" aria-expanded="false">Choose</button><div id="degree-options"></div></div>`;
+    const combo = document.querySelector<HTMLButtonElement>('[role="combobox"]')!;
+    const list = document.getElementById('degree-options')!;
+    combo.addEventListener('click', () => {
+      const open = combo.getAttribute('aria-expanded') !== 'true';
+      combo.setAttribute('aria-expanded', String(open));
+      list.innerHTML = open ? '<div role="option">Bachelor</div><div role="option">Master</div>' : '';
+    });
+    const { fields } = await scan();
+    expect(await fill({ [fields[0].id]: 'Doctorate' })).toMatchObject({ filled: 0, failed: [fields[0].id] });
+    expect(combo.getAttribute('aria-expanded')).toBe('false');
+    expect(list.textContent).toBe('');
+  });
+
   it('reports page handlers that reset values or ignore button selection', async () => {
     document.body.innerHTML = '<label>Name<input></label><form><fieldset><legend>Authorized?</legend><button type="button" aria-pressed="false">Yes</button><button type="button" aria-pressed="false">No</button></fieldset></form>';
     document.querySelector('input')!.addEventListener('change', (event) => { setTimeout(() => { (event.target as HTMLInputElement).value = ''; }, 20); });

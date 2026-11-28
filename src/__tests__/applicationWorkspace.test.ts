@@ -59,11 +59,12 @@ describe('application staging workspace', () => {
     expect(await loadWorkspace('owner')).toBeNull();
   });
 
-  it('allows optional blanks while blocking missing, invalid or unapproved required answers', () => {
+  it('allows optional blanks while blocking missing or invalid required answers', () => {
     expect(applicationReadiness(workspace.scan, null, workspace.values, {}, {}).some((item) => item.blocking)).toBe(false);
     expect(applicationReadiness(workspace.scan, null, {}, {}, {})[0].blocking).toBe(true);
     const scan = { ...workspace.scan, fields: [{ ...workspace.scan.fields[0], label: 'Gender', type: 'select', options: ['Man', 'Woman'] }] };
-    expect(applicationReadiness(scan, null, { name: 'Man' }, {}, {})[0].status).toBe('Awaiting your approval');
+    expect(applicationReadiness(scan, null, { name: 'Man' }, {}, {})[0].status).toBe('Prepared');
+    expect(applicationReadiness(scan, null, { name: 'Man' }, {}, {})[0].ready).toBe(true);
     expect(applicationReadiness(scan, null, { name: 'Man' }, { name: true }, {})[0].ready).toBe(true);
     expect(applicationReadiness(scan, null, { name: 'not-an-option' }, { name: true }, {})[0].blocking).toBe(true);
   });

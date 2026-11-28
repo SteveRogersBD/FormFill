@@ -81,8 +81,7 @@ describe('AI side panel workflow', () => {
       return { ...application, fields: application.fields.map((field) => ({ ...field, currentValue: filled ? field.id === 'a' ? 'Remote' : 'No' : '' })) };
     });
     await act(async () => button('Scan and analyze with AI').click());
-    await act(async () => (host.querySelector('.confirm-sensitive input') as HTMLInputElement).click());
-    await act(async () => button('Fill reviewed answers').click());
+    await act(async () => button('Fill prepared answers').click());
     await act(async () => button('Submit application').click());
     expect(host.textContent).toContain('may have reached the job site');
     expect(button('Submission requested').disabled).toBe(true);
@@ -103,8 +102,7 @@ describe('AI side panel workflow', () => {
     });
     await act(async () => button('Scan and analyze with AI').click());
     expect(button('Submit application').disabled).toBe(true);
-    await act(async () => (host.querySelector('.confirm-sensitive input') as HTMLInputElement).click());
-    await act(async () => button('Fill reviewed answers').click());
+    await act(async () => button('Fill prepared answers').click());
     expect(button('Submit application').disabled).toBe(false);
     changed = true;
     await act(async () => button('Submit application').click());
@@ -153,19 +151,19 @@ describe('AI side panel workflow', () => {
       return { filled: 1, failed: [], outcomes: { name: 'verified' } };
     });
     await act(async () => button('Scan and analyze with AI').click());
-    await act(async () => button('Fill reviewed answers').click());
+    await act(async () => button('Fill prepared answers').click());
     expect(host.textContent).toContain('Verified 1 field');
     expect(host.textContent).toContain('Receiving end does not exist');
     expect(host.textContent).toContain('Filled and verified');
   });
-  it('offers prepared answers without filling an unapproved sensitive answer', async () => {
+  it('fills prepared answers without requiring per-answer approval', async () => {
     await act(async () => button('Scan and analyze with AI').click());
-    expect(button('Fill reviewed answers').disabled).toBe(true);
-    expect(button('Fill prepared answers').disabled).toBe(false);
-    await act(async () => button('Fill prepared answers').click());
+    const fillPrepared = [...host.querySelectorAll('button')].find((item) => item.textContent === 'Fill prepared answers' && !item.disabled)!;
+    expect(fillPrepared.disabled).toBe(false);
+    await act(async () => fillPrepared.click());
     const calls = mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS');
     expect(calls).toHaveLength(1);
-    expect(calls[0][1].values).toEqual({ a: 'Remote' });
+    expect(calls[0][1].values).toEqual({ a: 'Remote', b: 'No' });
   });
 
   it('prepares profile facts when standing-answer storage fails', async () => {
@@ -175,17 +173,17 @@ describe('AI side panel workflow', () => {
     mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => message.type === 'APPLYAI_SCAN_FIELDS' ? { ...application, description: '', fields } : { filled: 1, failed: [] });
     await act(async () => button('Scan and analyze with AI').click());
     expect(host.textContent).toContain('Profile details are still available');
-    expect(button('Fill prepared answers').disabled).toBe(false);
-    await act(async () => button('Fill prepared answers').click());
+    const fillPrepared = [...host.querySelectorAll('button')].find((item) => item.textContent === 'Fill prepared answers' && !item.disabled)!;
+    expect(fillPrepared.disabled).toBe(false);
+    await act(async () => fillPrepared.click());
     expect(mocks.message.mock.calls.find((call) => call[1].type === 'APPLYAI_FILL_FIELDS')?.[1].values).toEqual({ name: 'Riley Example' });
   });
 
   it('does not reinject every iframe when filling an already-scanned application', async () => {
     await act(async () => button('Scan and analyze with AI').click());
-    await act(async () => (host.querySelector('.confirm-sensitive input') as HTMLInputElement).click());
     const inject = vi.fn().mockRejectedValue(new Error('An unrelated iframe cannot be accessed'));
     (chrome.scripting as any).executeScript = inject;
-    await act(async () => button('Fill reviewed answers').click());
+    await act(async () => button('Fill prepared answers').click());
     expect(inject).not.toHaveBeenCalled();
     expect(mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS')).toHaveLength(1);
   });
@@ -242,19 +240,17 @@ describe('AI side panel workflow', () => {
       return mutated ? { ...application, fields: [...application.fields, { id: 'new', label: 'Explain your answer', type: 'textarea', required: true, options: [], selector: '' }] } : application;
     });
     await act(async () => button('Scan and analyze with AI').click());
-    await act(async () => (host.querySelector('.confirm-sensitive input') as HTMLInputElement).click());
-    await act(async () => button('Fill reviewed answers').click());
+    await act(async () => button('Fill prepared answers').click());
     expect(host.textContent).toContain('Filling revealed new or changed questions');
     expect(host.textContent).toContain('Filled and verified');
-    expect(button('Fill reviewed answers').disabled).toBe(true);
+    expect(button('Fill prepared answers').disabled).toBe(true);
     expect(mocks.plan).toHaveBeenCalledOnce();
   });
 
   it('fills unchanged questions when a different field disappears', async () => {
     await act(async () => button('Scan and analyze with AI').click());
-    await act(async () => (host.querySelector('.confirm-sensitive input') as HTMLInputElement).click());
     mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => message.type === 'APPLYAI_SCAN_FIELDS' ? { ...application, fields: application.fields.slice(1) } : { filled: 1, failed: [] });
-    await act(async () => button('Fill reviewed answers').click());
+    await act(async () => button('Fill prepared answers').click());
     const calls = mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS');
     expect(calls).toHaveLength(1);
     expect(calls[0][1].values).toEqual({ b: 'No' });
@@ -277,16 +273,11 @@ describe('AI side panel workflow', () => {
     expect(mocks.profile).toHaveBeenCalledTimes(3); // initial load, scan, reanalysis
   });
 
-  it('blocks all filling until required sensitive answers are reviewed', async () => {
+  it('fills grounded required answers automatically but leaves unknown questions for the applicant', async () => {
     await act(async () => button('Scan and analyze with AI').click());
-    await act(async () => button('Fill reviewed answers').click());
-    let calls = mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS');
-    expect(calls).toHaveLength(0);
-    expect(button('Fill reviewed answers').disabled).toBe(true);
-    const approval = host.querySelector('.confirm-sensitive input') as HTMLInputElement;
-    await act(async () => approval.click());
-    await act(async () => button('Fill reviewed answers').click());
-    calls = mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS');
+    await act(async () => button('Fill prepared answers').click());
+    const calls = mocks.message.mock.calls.filter((call) => call[1].type === 'APPLYAI_FILL_FIELDS');
+    expect(calls).toHaveLength(1);
     expect(calls[0][1].values).toEqual({ a: 'Remote', b: 'No' });
   });
 });
