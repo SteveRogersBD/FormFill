@@ -64,6 +64,14 @@ Local PDF import recognizes separate company-first job headings and groups proje
 
 **Save imported resume** uploads the PDF to Storage and then saves the reviewed fields to Firestore. Missing buckets, denied uploads and upload retry limits now report actionable errors. **Save profile only** saves the fields to Firestore without uploading the selected PDF, allowing scans while Storage is unavailable. The selected PDF will not be attached to applications in that mode; select and save it again after Storage is configured. A $300 trial credit still needs an active billing account linked to the Firebase project before Storage can be provisioned.
 
+## Firebase account and AI billing
+
+The active CLI target is `apply-ai-34486`, owned by `cd43641@truman.edu`, with its existing `apply-ai-34486.firebasestorage.app` bucket. Keep the Web app settings in the ignored `.env.local` aligned with that project. The sign-in helper is hosted at `https://apply-ai-34486.web.app/auth-helper.html`.
+
+`VITE_FIREBASE_AI_BACKEND=agent-platform` uses Firebase AI Logic with the Agent Platform Gemini API (formerly Vertex AI), billed through the project's linked Cloud Billing account. Set `VITE_FIREBASE_AI_LOCATION=global`. The alternative `google` backend uses the Gemini Developer API, whose prepayment balance is separate from Google Cloud credits. Credit eligibility depends on the account and Google's current terms. All planner, connection-check and resume-extraction calls share the selected backend. Cloud resume extraction uses Firebase typed output schemas; Zod still validates returned facts and field constraints before review.
+
+After changing the Firebase Web app or backend, rebuild and reload the unpacked extension. If App Check rejects the new installation, register the token shown by that extension under the active project's Web app; do not disable App Check.
+
 ## AI behavior
 
 The extension runs a LangGraph workflow: **scan all current questions → saved database facts → local AI → approved cloud AI for unresolved questions → review → fill and verify → explicit submission**. LangChain Core runnables wrap generation and structured JSON parsing. The graph runs inside the side panel; no Python server is required.
