@@ -45,3 +45,11 @@ export async function verifyAppCheck(forceRefresh = false): Promise<void> {
   const { getToken } = await import('firebase/app-check');
   await getToken(appCheckInstance, forceRefresh);
 }
+
+export async function getFirebaseAI() {
+  const backend = import.meta.env.VITE_FIREBASE_AI_BACKEND || 'google';
+  if (!['google', 'agent-platform'].includes(backend)) throw new Error('VITE_FIREBASE_AI_BACKEND must be google or agent-platform.');
+  await getFirebaseServices();
+  const [{ getApp }, { getAI, GoogleAIBackend, AgentPlatformBackend }] = await Promise.all([import('firebase/app'), import('firebase/ai')]);
+  return getAI(getApp(), { backend: backend === 'agent-platform' ? new AgentPlatformBackend(import.meta.env.VITE_FIREBASE_AI_LOCATION || 'global') : new GoogleAIBackend() });
+}
