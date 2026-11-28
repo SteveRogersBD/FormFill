@@ -243,7 +243,7 @@ export function SidePanel({ user, onLogout }: { user: User; onLogout: () => Prom
         setNotice('The application is embedded on another site. Approve access to that site to scan its form.');
         return;
       }
-      const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid), loadPreferences(user.uid).catch(() => { setError('Saved standing answers could not be loaded. Profile details are still available; enter missing standing answers manually.'); return null; })]);
+      const [latestProfile, latestPreferences] = await Promise.all([loadProfile(user.uid).catch(() => { setError('Saved profile details could not be loaded. You can still scan and enter answers manually.'); return null; }), loadPreferences(user.uid).catch(() => { setError('Saved standing answers could not be loaded. Profile details are still available; enter missing standing answers manually.'); return null; })]);
       const currentProfile = latestProfile ?? emptyProfile();
       const currentPreferences = latestPreferences ?? emptyPreferences();
       setProfile(currentProfile); setPreferences(currentPreferences);
