@@ -45,6 +45,21 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); host.remove(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 
 describe('AI side panel workflow', () => {
+  it('scans all application questions without a resume or a saved profile', async () => {
+    mocks.profile.mockResolvedValue(null);
+    mocks.preferences.mockResolvedValue(emptyPreferences());
+    mocks.plan.mockResolvedValue({ entries: [], attempts: [], warnings: [] });
+    await act(async () => button('refresh the profile here').click());
+    expect(host.textContent).toContain('scan questions without a resume');
+    expect(button('Scan and analyze with AI').disabled).toBe(false);
+    await act(async () => button('Scan and analyze with AI').click());
+    expect(mocks.plan).toHaveBeenCalledOnce();
+    expect(mocks.plan.mock.calls[0][0]).toMatchObject({ profile: emptyProfile(), resumeText: '', allowCloud: false });
+    expect(mocks.plan.mock.calls[0][0].fields).toHaveLength(2);
+    expect(host.querySelectorAll('.answer-row')).toHaveLength(2);
+    expect(host.querySelectorAll<HTMLInputElement>('.answer-row input')[0]?.value ?? '').toBe('');
+  });
+
   it('preserves an uncertain submission request across reopening without automatically resending', async () => {
     let filled = false;
     mocks.message.mockImplementation(async (_tab: number, message: { type: string }) => {
