@@ -2,7 +2,7 @@ import { getGenerativeModel, InferenceMode, Schema, type TypedSchema } from 'fir
 import { z } from 'zod';
 import { isSensitiveField } from './fields';
 import { resumeProfileSchema, workExperienceSchema, type ResumeProfile } from './profile';
-import { firebaseAppCheckReady, getFirebaseAI, getFirebaseServices, verifyAppCheck } from './firebase';
+import { firebaseAppCheckReady, getFirebaseAI, verifyAppCheck } from './firebase';
 
 const modelOutputSchema = z.object({
   answers: z.array(z.object({ fieldId: z.string().max(80), answer: z.string().max(800) }).strict()).max(40),
@@ -39,7 +39,6 @@ export async function extractResumeWithAI(text: string, allowCloud: boolean) {
   try { localAvailable = Boolean(provider && await withTimeout(provider.availability(options), 5000, 'Local model availability check timed out.') === 'available'); } catch { /* Approved cloud extraction can still run. */ }
   const modes = [...(localAvailable ? [true] : []), ...(allowCloud ? [false] : [])];
   if (!modes.length) throw new Error('On-device AI is unavailable. Enable cloud resume extraction below, or review the local import manually.');
-  await getFirebaseServices();
   let failure: unknown;
   for (const onDevice of modes) {
     const controller = new AbortController();
