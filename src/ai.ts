@@ -1,9 +1,8 @@
-import { getAI, getGenerativeModel, GoogleAIBackend, InferenceMode } from 'firebase/ai';
-import { getApp } from 'firebase/app';
+import { getGenerativeModel, InferenceMode } from 'firebase/ai';
 import { z } from 'zod';
 import { isSensitiveField } from './fields';
 import { resumeProfileSchema, workExperienceSchema, type ResumeProfile } from './profile';
-import { firebaseAppCheckReady, getFirebaseServices, verifyAppCheck } from './firebase';
+import { firebaseAppCheckReady, getFirebaseAI, getFirebaseServices, verifyAppCheck } from './firebase';
 
 const modelOutputSchema = z.object({
   answers: z.array(z.object({ fieldId: z.string().max(80), answer: z.string().max(800) }).strict()).max(40),
@@ -33,7 +32,7 @@ export async function extractResumeWithAI(text: string, allowCloud: boolean) {
         if (!firebaseAppCheckReady) throw new Error('Cloud resume extraction requires Firebase App Check.');
         await withTimeout(verifyAppCheck(), 15_000, 'App Check verification timed out.');
       }
-      const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), onDevice
+      const model = getGenerativeModel(await getFirebaseAI(), onDevice
         ? { mode: InferenceMode.ONLY_ON_DEVICE, onDeviceParams: { createOptions: { ...options, signal: controller.signal }, promptOptions: { responseConstraint: schema } } }
         : { mode: InferenceMode.ONLY_IN_CLOUD, inCloudParams: { model: import.meta.env.VITE_FIREBASE_AI_MODEL || 'gemini-3.5-flash-lite', generationConfig: { responseMimeType: 'application/json', responseJsonSchema: schema, maxOutputTokens: 16384 } } });
       if (onDevice) await withTimeout(model.initializeDeviceModel(), DEVICE_START_TIMEOUT_MS, 'Local resume extraction could not start.');
@@ -85,14 +84,14 @@ function makePrompt(fields: AIField[], profile: ResumeProfile, cloud: boolean) {
 }
 
 export async function suggestOnDeviceAnswers(fields: AIField[], profile: ResumeProfile) {
-  const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), { mode: InferenceMode.ONLY_ON_DEVICE });
+  const model = getGenerativeModel(await getFirebaseAI(), { mode: InferenceMode.ONLY_ON_DEVICE });
   await withTimeout(model.initializeDeviceModel(), DEVICE_START_TIMEOUT_MS, 'On-device AI did not start. Chrome needs its built-in AI model ready first, or use cloud AI after approving it.');
   const result = await withTimeout(model.generateContent(makePrompt(fields, profile, false)), GENERATE_TIMEOUT_MS, 'On-device AI stopped responding and was cancelled. Nothing was changed.');
   return { answers: validateAnswers(result.response.text(), fields), source: result.response.inferenceSource ?? 'ON_DEVICE' };
 }
 
 export async function suggestCloudAnswers(fields: AIField[], profile: ResumeProfile) {
-  const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), { mode: InferenceMode.ONLY_IN_CLOUD });
+  const model = getGenerativeModel(await getFirebaseAI(), { mode: InferenceMode.ONLY_IN_CLOUD });
   const result = await withTimeout(model.generateContent(makePrompt(fields, profile, true)), GENERATE_TIMEOUT_MS, 'Cloud AI did not answer in time and was cancelled. Nothing was changed.');
   return { answers: validateAnswers(result.response.text(), fields), source: result.response.inferenceSource ?? 'IN_CLOUD' };
 }
@@ -113,7 +112,7 @@ function makeCoverLetterPrompt(profile: ResumeProfile, jobDescription: string) {
 async function draftCoverLetter(profile: ResumeProfile, jobDescription: string, onDevice: boolean) {
   const description = jobDescriptionSchema.parse(jobDescription);
   const mode = onDevice ? InferenceMode.ONLY_ON_DEVICE : InferenceMode.ONLY_IN_CLOUD;
-  const model = getGenerativeModel(getAI(getApp(), { backend: new GoogleAIBackend() }), { mode });
+  const model = getGenerativeModel(await getFirebaseAI(), { mode });
   if (onDevice) await withTimeout(model.initializeDeviceModel(), DEVICE_START_TIMEOUT_MS, 'On-device AI did not start. Chrome needs its built-in AI model ready first, or use cloud AI after approving it.');
   const result = await withTimeout(model.generateContent(makeCoverLetterPrompt(profile, description)), GENERATE_TIMEOUT_MS, 'AI drafting stopped responding and was cancelled. You can still write the letter yourself.');
   return {
