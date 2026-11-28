@@ -3,10 +3,9 @@ import { emptyProfile } from '../profile';
 import { emptyPreferences } from '../preferences';
 
 const mocks = vi.hoisted(() => ({ prompt: vi.fn(), measure: vi.fn(), destroy: vi.fn(), local: vi.fn(), initialize: vi.fn(), generate: vi.fn(), getModel: vi.fn(), token: vi.fn(), appCheck: true }));
-vi.mock('firebase/app', () => ({ getApp: () => ({}) }));
-vi.mock('../firebase', () => ({ get firebaseAppCheckReady() { return mocks.appCheck; }, getFirebaseServices: async () => ({}), verifyAppCheck: mocks.token }));
+vi.mock('../firebase', () => ({ get firebaseAppCheckReady() { return mocks.appCheck; }, getFirebaseAI: async () => ({}), getFirebaseServices: async () => ({}), verifyAppCheck: mocks.token }));
 vi.mock('firebase/ai', () => ({
-  getAI: () => ({}), GoogleAIBackend: class {}, getGenerativeModel: mocks.getModel,
+  getGenerativeModel: mocks.getModel,
   InferenceMode: { ONLY_ON_DEVICE: 'device', ONLY_IN_CLOUD: 'cloud' }, InferenceSource: { ON_DEVICE: 'on_device', IN_CLOUD: 'in_cloud' },
   Schema: { object: (value: unknown) => value, array: (value: unknown) => value, string: () => ({}), enumString: (value: unknown) => value },
 }));
